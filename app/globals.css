@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes aurora1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(60px, -50px) scale(1.15); }
+  66% { transform: translate(-30px, 30px) scale(0.9); }
+}
+
+@keyframes aurora2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-50px, 60px) scale(0.9); }
+  66% { transform: translate(30px, -30px) scale(1.12); }
+}
+
+@keyframes aurora3 {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(40px, -30px); }
+  66% { transform: translate(-25px, 40px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .absolute[aria-hidden="true"] > .rounded-full {
+    animation: none !important;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 40 6% 97%;
+    --foreground: 40 8% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 40 8% 10%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 8% 95%;
+    --secondary-foreground: 40 8% 10%;
+    --muted: 40 6% 94%;
+    --muted-foreground: 37 4% 44%;
+    --accent: 214 95% 93%;
+    --accent-foreground: 224 76% 48%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 36 10% 90%;
+    --input: 36 10% 90%;
+    --ring: 217 91% 60%;
+    --radius: 0.625rem;
+    --font-sans: "Noto Sans SC", "Inter", system-ui, sans-serif;
+    --font-serif: "Noto Serif SC", Georgia, serif;
+  }
+
+  .dark {
+    --background: 30 8% 10%;
+    --foreground: 40 6% 95%;
+    --card: 30 10% 14%;
+    --card-foreground: 40 6% 95%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 10% 14%;
+    --secondary-foreground: 40 6% 95%;
+    --muted: 30 10% 14%;
+    --muted-foreground: 30 5% 60%;
+    --accent: 30 10% 14%;
+    --accent-foreground: 214 95% 93%;
+    --destructive: 0 91% 71%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 6% 22%;
+    --input: 30 6% 22%;
+    --ring: 213 94% 68%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}

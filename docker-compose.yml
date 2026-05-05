@@ -1,0 +1,17 @@
+services:
+  designdraft:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      DESIGNDRAFT_WORKSPACE_DIR: /app/.workspace
+    volumes:
+      - designdraft_workspace:/app/.workspace
+    restart: unless-stopped
+
+volumes:
+  designdraft_workspace:
