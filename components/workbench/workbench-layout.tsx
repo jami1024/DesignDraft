@@ -1,107 +1,23 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
-import { Layers3, Loader2, Sparkles, Zap } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUp, Clock, FileText, Image, Loader2, Paperclip, Sparkles, X } from "lucide-react";
 
 import type { PageSuggestion } from "@/types";
-import type { StylePresetId } from "@/lib/styles";
-import { DocumentUpload } from "./document-upload";
-import { SuggestionList } from "./suggestion-list";
-import { StyleSelector } from "./style-selector";
 import { PreviewPanel } from "./preview-panel";
-import { ChatInput } from "./chat-input";
+
+type Attachment = { name: string; url: string; type: "image" | "file"; size?: string };
 
 type ChatMessage = {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
+  thinking?: string;
+  suggestions?: PageSuggestion[];
+  generatedVersion?: number;
+  attachments?: Attachment[];
+  timestamp: number;
 };
-
-type VersionRecord = {
-  id: string;
-  number: number;
-  summary: string;
-  createdAt: string;
-  source: string;
-};
-
-const MOCK_SUGGESTIONS: PageSuggestion[] = [
-  {
-    id: "landing-page",
-    projectId: "",
-    name: "产品介绍落地页",
-    purpose: "面向客户的产品介绍页面，突出核心价值、功能和行动按钮。",
-    audience: "潜在客户、内部评审人员",
-    modules: ["Hero", "核心价值", "功能说明", "使用流程", "行动按钮"],
-    recommendedSkillIds: ["web-landing"],
-    visualDirection: "Modern Minimal",
-    complexity: "medium",
-  },
-  {
-    id: "dashboard",
-    projectId: "",
-    name: "数据看板页面",
-    purpose: "展示关键指标、状态和操作入口。",
-    audience: "运营人员、管理者",
-    modules: ["指标卡", "趋势图", "任务列表", "状态筛选"],
-    recommendedSkillIds: ["dashboard"],
-    visualDirection: "Tech Utility",
-    complexity: "high",
-  },
-  {
-    id: "executive-summary",
-    projectId: "",
-    name: "汇报摘要页",
-    purpose: "凝练的结构呈现背景、方案、收益和后续计划。",
-    audience: "管理层、客户决策人",
-    modules: ["背景", "核心方案", "关键收益", "时间线", "结论"],
-    recommendedSkillIds: ["pitch-page"],
-    visualDirection: "Editorial",
-    complexity: "low",
-  },
-];
-
-const MOCK_HTML = `<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>产品介绍</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: "Noto Sans SC", system-ui, sans-serif; background: #FAFAF9; color: #1C1917; }
-    .hero { max-width: 800px; margin: 0 auto; padding: 80px 24px; text-align: center; }
-    h1 { font-size: 48px; font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; }
-    .subtitle { margin-top: 16px; font-size: 18px; color: #57534E; line-height: 1.6; }
-    .cta { display: inline-block; margin-top: 32px; padding: 14px 32px; background: #2563EB; color: white; border-radius: 12px; font-weight: 600; text-decoration: none; font-size: 16px; }
-    .features { max-width: 800px; margin: 0 auto; padding: 0 24px 80px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-    .card { padding: 24px; border: 1px solid #E7E5E4; border-radius: 16px; background: white; }
-    .card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
-    .card p { font-size: 14px; color: #78716C; line-height: 1.6; }
-  </style>
-</head>
-<body>
-  <section class="hero" data-designdraft-id="hero">
-    <h1>让创意快速落地</h1>
-    <p class="subtitle">输入你的需求，AI 帮你生成可交互的演示页面。无需设计经验，几分钟内完成。</p>
-    <a href="#features" class="cta">开始使用</a>
-  </section>
-  <section class="features" id="features" data-designdraft-id="features">
-    <div class="card" data-designdraft-id="feature-1">
-      <h3>智能分析</h3>
-      <p>上传文档或输入需求，AI 自动理解并给出页面建议。</p>
-    </div>
-    <div class="card" data-designdraft-id="feature-2">
-      <h3>实时预览</h3>
-      <p>生成的页面即时展示，所见即所得。</p>
-    </div>
-    <div class="card" data-designdraft-id="feature-3">
-      <h3>精细迭代</h3>
-      <p>点选元素或对话式修改，快速打磨到满意为止。</p>
-    </div>
-  </section>
-</body>
-</html>`;
 
 type WorkbenchLayoutProps = {
   projectId: string;
@@ -111,197 +27,412 @@ type WorkbenchLayoutProps = {
 };
 
 export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentId, initialTextInput }: WorkbenchLayoutProps) {
-  const [latestDocumentId, setLatestDocumentId] = useState<string | null>(initialLatestDocumentId);
-  const [suggestions, setSuggestions] = useState<PageSuggestion[]>([]);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<PageSuggestion | null>(null);
-  const [stylePresetId, setStylePresetId] = useState<StylePresetId>("modern-minimal");
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (initialTextInput) {
+      return [{ id: "init-user", role: "user" as const, content: initialTextInput, timestamp: Date.now() - 5000 }];
+    }
+    return [];
+  });
+  const [inputText, setInputText] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
-  const [versions, setVersions] = useState<VersionRecord[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [versionCount, setVersionCount] = useState(0);
+  const [pageName, setPageName] = useState("预览");
+  const [extractedText, setExtractedText] = useState(initialTextInput ?? "");
+  const [selectedSuggestion, setSelectedSuggestion] = useState<PageSuggestion | null>(null);
+  const [needsAnalysis, setNeedsAnalysis] = useState(!!initialTextInput);
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAnalyze = useCallback(async () => {
-    if (!latestDocumentId) return;
-    setIsAnalyzing(true);
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }), 50);
+  }, []);
+
+  useEffect(() => { scrollToBottom(); }, [messages.length, scrollToBottom]);
+
+  const analyzeText = useCallback(async (text: string) => {
+    setIsThinking(true);
     try {
+      let docId = initialLatestDocumentId;
+      if (text.trim()) {
+        const saveRes = await fetch("/api/documents/text-input", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, text }),
+        });
+        const saveBody = (await saveRes.json()) as { document?: { id: string } };
+        if (saveBody.document) docId = saveBody.document.id;
+      }
+      if (!docId) { setIsThinking(false); return; }
+      setExtractedText(text);
       const res = await fetch("/api/documents/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, documentId: latestDocumentId }),
+        body: JSON.stringify({ projectId, documentId: docId }),
       });
       const body = (await res.json()) as { suggestions?: PageSuggestion[] };
-      const result = body.suggestions ?? MOCK_SUGGESTIONS;
-      setSuggestions(result.map((s) => ({ ...s, projectId })));
+      const suggestions = body.suggestions ?? [];
+      if (suggestions.length > 0) {
+        setMessages((prev) => [...prev, {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: "我分析了你的需求，推荐以下页面方案。点击选择一个，我来帮你生成。",
+          thinking: "分析需求中…",
+          suggestions,
+          timestamp: Date.now(),
+        }]);
+      } else {
+        setMessages((prev) => [...prev, {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: "分析完成，但没有生成方案。请尝试提供更详细的需求描述。",
+          timestamp: Date.now(),
+        }]);
+      }
     } catch {
-      setSuggestions(MOCK_SUGGESTIONS.map((s) => ({ ...s, projectId })));
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [projectId, latestDocumentId]);
-
-  const handleGenerate = useCallback(() => {
-    if (!selectedSuggestion) return;
-    setIsGenerating(true);
-    setTimeout(() => {
-      setGeneratedHtml(MOCK_HTML);
-      setVersions([{ id: "v1", number: 1, summary: "初始生成", createdAt: new Date().toISOString(), source: "generation" }]);
-      setIsGenerating(false);
-    }, 1500);
-  }, [selectedSuggestion]);
-
-  const handleSendMessage = useCallback((content: string) => {
-    const userMsg: ChatMessage = { id: `msg-${Date.now()}`, role: "user", content };
-    setChatMessages((prev) => [...prev, userMsg]);
-
-    setTimeout(() => {
-      const assistantMsg: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
+      setMessages((prev) => [...prev, {
+        id: `a-${Date.now()}`,
         role: "assistant",
-        content: `已根据你的意见修改：「${content}」。页面已更新到新版本。`,
-      };
-      setChatMessages((prev) => [...prev, assistantMsg]);
-      setVersions((prev) => [{
-        id: `v${prev.length + 1}`,
-        number: prev.length + 1,
-        summary: content.slice(0, 30),
-        createdAt: new Date().toISOString(),
-        source: "chat",
-      }, ...prev]);
-    }, 1200);
+        content: "分析过程中出错了，请稍后重试。",
+        timestamp: Date.now(),
+      }]);
+    } finally {
+      setIsThinking(false);
+    }
+  }, [projectId, initialLatestDocumentId]);
+
+  useEffect(() => {
+    if (needsAnalysis && initialTextInput) {
+      setNeedsAnalysis(false);
+      void analyzeText(initialTextInput);
+    }
+  }, [needsAnalysis, initialTextInput, analyzeText]);
+
+  const generateFromSuggestion = useCallback(async (suggestion: PageSuggestion) => {
+    setSelectedSuggestion(suggestion);
+    setPageName(suggestion.name);
+    setIsThinking(true);
+    setMessages((prev) => [...prev, {
+      id: `sys-gen-${Date.now()}`,
+      role: "assistant",
+      content: "",
+      thinking: `正在生成「${suggestion.name}」…`,
+      timestamp: Date.now(),
+    }]);
+
+    try {
+      const res = await fetch("/api/pages/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, extractedText, suggestion, stylePreset: "modern-minimal" }),
+      });
+
+      let html = "";
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value);
+          for (const line of text.split("\n")) {
+            if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+            try {
+              const data = JSON.parse(line.slice(6)) as { chunk?: string; error?: string };
+              if (data.chunk) { html += data.chunk; setGeneratedHtml(html); }
+              if (data.error) throw new Error(data.error);
+            } catch { /* skip parse errors */ }
+          }
+        }
+      }
+
+      setVersionCount(1);
+      setMessages((prev) => {
+        const filtered = prev.filter((m) => !m.id.startsWith("sys-gen-"));
+        return [...filtered, {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: `已生成「${suggestion.name}」。你可以告诉我需要修改什么。`,
+          generatedVersion: 1,
+          timestamp: Date.now(),
+        }];
+      });
+    } catch {
+      setMessages((prev) => {
+        const filtered = prev.filter((m) => !m.id.startsWith("sys-gen-"));
+        return [...filtered, { id: `a-${Date.now()}`, role: "assistant", content: "页面生成失败，请重试。", timestamp: Date.now() }];
+      });
+    } finally {
+      setIsThinking(false);
+    }
+  }, [projectId, extractedText]);
+
+  const optimizePage = useCallback(async (instruction: string) => {
+    if (!generatedHtml || !selectedSuggestion) return;
+    setIsThinking(true);
+
+    try {
+      const res = await fetch("/api/pages/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, extractedText, suggestion: selectedSuggestion, currentHtml: generatedHtml, instruction }),
+      });
+
+      let html = "";
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value);
+          for (const line of text.split("\n")) {
+            if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+            try {
+              const data = JSON.parse(line.slice(6)) as { chunk?: string; error?: string };
+              if (data.chunk) { html += data.chunk; setGeneratedHtml(html); }
+              if (data.error) throw new Error(data.error);
+            } catch { /* skip */ }
+          }
+        }
+      }
+
+      setVersionCount((v) => v + 1);
+      setMessages((prev) => [...prev, {
+        id: `a-${Date.now()}`,
+        role: "assistant",
+        content: `已修改：「${instruction}」。`,
+        generatedVersion: versionCount + 1,
+        timestamp: Date.now(),
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", content: "修改失败，请重试。", timestamp: Date.now() }]);
+    } finally {
+      setIsThinking(false);
+    }
+  }, [projectId, extractedText, generatedHtml, selectedSuggestion, versionCount]);
+
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPendingAttachments((prev) => [...prev, { name: file.name, url, type: "image" }]);
+    e.target.value = "";
   }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const size = file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`;
+    setPendingAttachments((prev) => [...prev, { name: file.name, url: "", type: "file", size }]);
+    e.target.value = "";
+  }, []);
+
+  const removePendingAttachment = useCallback((index: number) => {
+    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleSend = useCallback(() => {
+    const text = inputText.trim();
+    if (!text && pendingAttachments.length === 0) return;
+    if (isThinking) return;
+
+    const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", content: text, attachments: pendingAttachments.length > 0 ? [...pendingAttachments] : undefined, timestamp: Date.now() };
+    setPendingAttachments([]);
+    setMessages((prev) => [...prev, userMsg]);
+    setInputText("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
+
+    if (!generatedHtml && !selectedSuggestion) {
+      void analyzeText(text);
+    } else if (generatedHtml) {
+      void optimizePage(text);
+    }
+  }, [inputText, isThinking, pendingAttachments, generatedHtml, selectedSuggestion, analyzeText, optimizePage]);
+
+  const handleSuggestionClick = useCallback((suggestion: PageSuggestion) => {
+    setMessages((prev) => [...prev, { id: `u-pick-${Date.now()}`, role: "user", content: `生成「${suggestion.name}」`, timestamp: Date.now() }]);
+    void generateFromSuggestion(suggestion);
+  }, [generateFromSuggestion]);
+
+  function formatTime(ts: number) {
+    return new Date(ts).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  }
 
   return (
     <div className="grid h-[calc(100vh-57px)] grid-cols-1 lg:grid-cols-[360px_1fr]">
-      {/* 左侧栏 */}
-      <aside className="flex flex-col border-r border-[#E7E5E4] bg-[#FAFAF9] dark:border-[#44403C] dark:bg-[#1C1917] lg:overflow-y-auto">
-        {/* 需求输入 */}
-        <div className="border-b border-[#E7E5E4]/60 p-4 dark:border-[#44403C]/60">
-          <DocumentUpload projectId={projectId} initialText={initialTextInput} onDocumentSaved={setLatestDocumentId} />
-        </div>
+      {/* 对话侧栏 */}
+      <aside className="flex flex-col border-r border-[#E7E5E4] bg-white dark:border-[#44403C] dark:bg-[#292524]">
+        {/* 消息区 */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <Sparkles className="h-8 w-8 text-[#D6D3D1] dark:text-[#57534E]" />
+              <p className="mt-4 text-sm font-medium text-[#1C1917] dark:text-[#FAFAF9]">描述你想要的页面</p>
+              <p className="mt-1 text-xs text-[#A8A29E] dark:text-[#78716C]">例如：一个 SaaS 产品定价页面</p>
+            </div>
+          )}
 
-        {/* 分析按钮 */}
-        <div className="border-b border-[#E7E5E4]/60 px-4 py-3 dark:border-[#44403C]/60">
-          <button
-            type="button"
-            onClick={() => void handleAnalyze()}
-            disabled={!latestDocumentId || isAnalyzing}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#1D4ED8] focus-visible:ring-2 focus-visible:ring-[#2563EB]/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                分析中…
-              </>
-            ) : (
-              <>
-                <Layers3 className="h-4 w-4" />
-                分析需求
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* 方案列表 */}
-        {suggestions.length > 0 && (
-          <div className="border-b border-[#E7E5E4]/60 p-4 dark:border-[#44403C]/60">
-            <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold text-[#78716C] dark:text-[#A8A29E]">
-              <Sparkles className="h-3.5 w-3.5" />
-              页面方案
-            </h3>
-            <SuggestionList
-              suggestions={suggestions}
-              selectedId={selectedSuggestion?.id ?? null}
-              onSelect={(s) => setSelectedSuggestion(s)}
-            />
-          </div>
-        )}
-
-        {/* 风格选择 + 生成按钮 */}
-        {selectedSuggestion && (
-          <div className="border-b border-[#E7E5E4]/60 p-4 dark:border-[#44403C]/60">
-            <StyleSelector value={stylePresetId} onChange={setStylePresetId} />
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] px-4 py-2 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#44403C] focus-visible:ring-2 focus-visible:ring-[#3B82F6]/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-[#FAFAF9] dark:text-[#1C1917] dark:hover:bg-[#E7E5E4]"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  生成中…
-                </>
-              ) : (
-                <>
-                  <Zap className="h-4 w-4" />
-                  生成页面
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* 版本历史 */}
-        {versions.length > 0 && (
-          <div className="flex-1 p-4">
-            <h3 className="mb-3 text-xs font-semibold text-[#78716C] dark:text-[#A8A29E]">
-              版本历史 · {versions.length} 个版本
-            </h3>
-            <div className="space-y-1.5">
-              {versions.map((v, i) => (
-                <div
-                  key={v.id}
-                  className={`rounded-lg px-3 py-2 text-xs ${
-                    i === 0
-                      ? "border border-[#2563EB]/20 bg-[#EFF6FF] dark:border-[#60A5FA]/20 dark:bg-[#1e3a8a]/10"
-                      : "text-[#78716C] hover:bg-[#F5F5F4] dark:text-[#A8A29E] dark:hover:bg-[#292524]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={`font-semibold ${i === 0 ? "text-[#2563EB] dark:text-[#60A5FA]" : ""}`}>v{v.number}</span>
-                    <span className="text-[#A8A29E] dark:text-[#78716C]">
-                      {new Date(v.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
+          <div className="space-y-0.5 px-4 py-4">
+            {messages.map((msg) => (
+              <div key={msg.id} className="py-2">
+                {msg.role === "user" ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] space-y-2">
+                      {msg.attachments?.filter((a) => a.type === "image").map((a, i) => (
+                        <div key={i} className="flex justify-end">
+                          <img src={a.url} alt={a.name} className="max-h-32 rounded-lg" />
+                        </div>
+                      ))}
+                      {msg.attachments?.filter((a) => a.type === "file").map((a, i) => (
+                        <div key={i} className="flex justify-end">
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#292524] px-3 py-1.5 text-xs text-[#D6D3D1] dark:bg-[#44403C]">
+                            <FileText className="h-3 w-3" />{a.name}<span className="text-[#78716C]">{a.size}</span>
+                          </span>
+                        </div>
+                      ))}
+                      {msg.content && (
+                        <div className="rounded-2xl rounded-br-md bg-[#1C1917] px-3.5 py-2 text-sm leading-relaxed text-white dark:bg-[#FAFAF9] dark:text-[#1C1917]">
+                          {msg.content}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="mt-0.5 text-[#57534E] dark:text-[#A8A29E]">{v.summary}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {msg.thinking && (
+                      <p className="flex items-center gap-1.5 text-xs text-[#A8A29E] dark:text-[#78716C]">
+                        <Sparkles className="h-3 w-3" />
+                        {msg.thinking}
+                      </p>
+                    )}
+
+                    {msg.generatedVersion && (
+                      <div className="flex items-center gap-2 rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] px-3 py-2 dark:border-[#44403C] dark:bg-[#1C1917]">
+                        <FileText className="h-3.5 w-3.5 text-[#A8A29E]" />
+                        <span className="text-xs font-medium text-[#1C1917] dark:text-[#FAFAF9]">{pageName}</span>
+                        <span className="rounded bg-[#E7E5E4] px-1.5 py-0.5 text-[10px] font-medium text-[#78716C] dark:bg-[#44403C] dark:text-[#A8A29E]">v{msg.generatedVersion}</span>
+                      </div>
+                    )}
+
+                    <p className="text-sm leading-relaxed text-[#1C1917] dark:text-[#FAFAF9]">{msg.content}</p>
+
+                    {msg.suggestions && (
+                      <div className="mt-1 space-y-1.5">
+                        {msg.suggestions.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => handleSuggestionClick(s)}
+                            className="w-full rounded-lg border border-[#E7E5E4] px-3 py-2 text-left transition-colors hover:bg-[#F5F5F4] dark:border-[#44403C] dark:hover:bg-[#1C1917]"
+                          >
+                            <span className="text-sm font-medium text-[#1C1917] dark:text-[#FAFAF9]">{s.name}</span>
+                            <p className="mt-0.5 text-xs text-[#78716C] dark:text-[#A8A29E]">{s.purpose}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 text-[11px] text-[#D6D3D1] dark:text-[#57534E]">
+                      <Clock className="h-3 w-3" />
+                      {formatTime(msg.timestamp)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {isThinking && (
+              <div className="py-2">
+                <div className="flex items-center gap-2 text-xs text-[#A8A29E] dark:text-[#78716C]">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  思考中…
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 底部输入 */}
+        <div className="border-t border-[#E7E5E4] px-4 py-3 dark:border-[#44403C]">
+          {pendingAttachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {pendingAttachments.map((a, i) => (
+                <div key={i} className="group relative">
+                  {a.type === "image" ? (
+                    <img src={a.url} alt={a.name} className="h-16 w-16 rounded-lg object-cover" />
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#F5F5F4] px-2.5 py-1.5 text-xs text-[#57534E] dark:bg-[#1C1917] dark:text-[#A8A29E]">
+                      <FileText className="h-3 w-3" />{a.name}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removePendingAttachment(i)}
+                    className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1C1917] text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-[#FAFAF9] dark:text-[#1C1917]"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
                 </div>
               ))}
             </div>
+          )}
+          <div className="flex items-end gap-2">
+            <div className="flex shrink-0 items-center gap-0.5 pb-1.5">
+              <button type="button" onClick={() => imageInputRef.current?.click()} disabled={isThinking} className="rounded-md p-1.5 text-[#A8A29E] transition-colors hover:bg-[#F5F5F4] hover:text-[#57534E] disabled:opacity-50 dark:text-[#78716C] dark:hover:bg-[#1C1917]" title="上传图片">
+                <Image className="h-4 w-4" />
+              </button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isThinking} className="rounded-md p-1.5 text-[#A8A29E] transition-colors hover:bg-[#F5F5F4] hover:text-[#57534E] disabled:opacity-50 dark:text-[#78716C] dark:hover:bg-[#1C1917]" title="上传文件">
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+              <input ref={fileInputRef} type="file" accept=".md,.txt,.pdf,.docx" className="hidden" onChange={handleFileSelect} />
+            </div>
+            <textarea
+              ref={inputRef}
+              value={inputText}
+              onChange={(e) => { setInputText(e.target.value); e.target.style.height = "auto"; e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`; }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder="提出后续问题…"
+              rows={1}
+              disabled={isThinking}
+              className="flex-1 resize-none overflow-hidden rounded-xl border border-[#E7E5E4] bg-[#FAFAF9] px-3.5 py-2.5 text-sm leading-relaxed text-[#1C1917] outline-none transition-colors placeholder:text-[#A8A29E] focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6]/20 disabled:opacity-50 dark:border-[#44403C] dark:bg-[#1C1917] dark:text-[#FAFAF9]"
+            />
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={(!inputText.trim() && pendingAttachments.length === 0) || isThinking}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2563EB] text-white transition-colors hover:bg-[#1D4ED8] disabled:opacity-30"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
           </div>
-        )}
+        </div>
       </aside>
 
-      {/* 右侧预览区 */}
-      <div className="relative flex flex-col overflow-hidden bg-[#F5F5F4] dark:bg-[#0C0A09]">
+      {/* 预览区 */}
+      <div className="flex flex-col overflow-hidden bg-[#F5F5F4] dark:bg-[#0C0A09]">
         {generatedHtml ? (
-          <>
-            <PreviewPanel
-              html={generatedHtml}
-              pageName={selectedSuggestion?.name ?? "预览"}
-              versionNumber={versions.length}
-            />
-            <div className="absolute inset-x-0 bottom-0 z-10">
-              <ChatInput messages={chatMessages} onSend={handleSendMessage} />
-            </div>
-          </>
+          <PreviewPanel html={generatedHtml} pageName={pageName} versionNumber={versionCount} />
         ) : (
-          <div className="flex flex-1 items-center justify-center p-8">
-            <div className="max-w-xs text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E7E5E4]/50 text-[#A8A29E] dark:bg-[#292524] dark:text-[#78716C]">
-                <Sparkles className="h-6 w-6" />
-              </div>
-              <h3 className="mt-4 font-serif text-base font-semibold text-[#1C1917] dark:text-[#FAFAF9]">
-                {isGenerating ? "正在生成页面…" : "页面预览"}
-              </h3>
-              <p className="mt-1.5 text-xs leading-relaxed text-[#A8A29E] dark:text-[#78716C]">
-                {isGenerating
-                  ? "AI 正在根据你选择的方案生成页面，请稍候"
-                  : "在左侧输入需求 → 分析 → 选择方案 → 生成页面"
-                }
-              </p>
-              {isGenerating && (
-                <Loader2 className="mx-auto mt-4 h-5 w-5 animate-spin text-[#2563EB]" />
+          <div className="flex flex-1 items-center justify-center">
+            <div className="text-center">
+              {isThinking ? (
+                <>
+                  <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#2563EB]" />
+                  <p className="mt-4 text-sm text-[#78716C]">正在处理…</p>
+                </>
+              ) : (
+                <>
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7E5E4]/30 dark:bg-[#292524]">
+                    <FileText className="h-7 w-7 text-[#D6D3D1] dark:text-[#57534E]" />
+                  </div>
+                  <p className="mt-4 text-sm font-medium text-[#78716C]">页面预览</p>
+                  <p className="mt-1 text-xs text-[#A8A29E]">在左侧描述你的需求开始</p>
+                </>
               )}
             </div>
           </div>

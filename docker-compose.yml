@@ -9,6 +9,10 @@ services:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
       DESIGNDRAFT_WORKSPACE_DIR: /app/.workspace
+      DESIGNDRAFT_AGENT_PROVIDER: ${DESIGNDRAFT_AGENT_PROVIDER:-mock}
+      DESIGNDRAFT_AGENT_MODEL: ${DESIGNDRAFT_AGENT_MODEL:-}
+      DESIGNDRAFT_AGENT_BASE_URL: ${DESIGNDRAFT_AGENT_BASE_URL:-}
+      DESIGNDRAFT_AGENT_API_KEY: ${DESIGNDRAFT_AGENT_API_KEY:-}
     volumes:
       - designdraft_workspace:/app/.workspace
     restart: unless-stopped

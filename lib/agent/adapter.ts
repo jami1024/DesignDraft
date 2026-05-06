@@ -1,5 +1,6 @@
 import type { PageSuggestion } from "@/types";
 import type { AgentModelConfig } from "./model-config";
+import { DeepSeekRuntime } from "./deepseek-runtime";
 import { LightweightModelRuntime } from "./lightweight-runtime";
 import { PiAgentRuntime } from "./pi-runtime";
 
@@ -48,6 +49,10 @@ export interface AgentRuntimeAdapter {
 export function createAgentRuntime(config: AgentModelConfig): AgentRuntimeAdapter {
   if (config.provider === "pi") {
     return new PiAgentRuntime(config);
+  }
+
+  if (config.provider === "deepseek" || config.provider === "openai") {
+    return new DeepSeekRuntime(config);
   }
 
   return new LightweightModelRuntime(config);
