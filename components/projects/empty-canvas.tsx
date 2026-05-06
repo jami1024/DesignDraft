@@ -1,5 +1,4 @@
 "use client";
-
 import { motion, useReducedMotion } from "framer-motion";
 import type { Variants } from "framer-motion";
 
@@ -24,28 +23,28 @@ export function EmptyCanvas({ onSuggestionClick }: { onSuggestionClick: (text: s
 
   return (
     <motion.div
-      className="rounded-xl border border-dashed border-[#D6D3D1] bg-white px-6 py-16 text-center dark:border-[#57534E] dark:bg-[#292524]"
+      className="rounded-2xl border border-[#E7E5E4] bg-gradient-to-b from-white to-[#FAFAF9] px-6 py-16 text-center dark:border-[#44403C] dark:from-[#292524] dark:to-[#1C1917]"
       initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center">
+      <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center">
         <svg viewBox="0 0 80 80" fill="none" className="h-full w-full">
           <motion.circle
             cx="40" cy="28" r="10"
-            stroke="#D6D3D1" strokeWidth="1.5" className="dark:stroke-[#57534E]"
+            fill="rgba(59,130,246,0.04)" stroke="#D6D3D1" strokeWidth="1.5" className="dark:stroke-[#57534E]"
             animate={shouldReduceMotion ? {} : { y: [0, -3, 0], rotate: [0, 5, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.rect
             x="18" y="45" width="16" height="16" rx="3"
-            stroke="#D6D3D1" strokeWidth="1.5" className="dark:stroke-[#57534E]"
+            fill="rgba(245,158,11,0.04)" stroke="#D6D3D1" strokeWidth="1.5" className="dark:stroke-[#57534E]"
             animate={shouldReduceMotion ? {} : { y: [0, 3, 0], rotate: [0, -3, 0] }}
             transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
           />
           <motion.polygon
             points="56,62 48,48 64,48"
-            stroke="#D6D3D1" strokeWidth="1.5" className="dark:stroke-[#57534E]"
+            fill="rgba(139,92,246,0.04)" stroke="#D6D3D1" strokeWidth="1.5" className="dark:stroke-[#57534E]"
             animate={shouldReduceMotion ? {} : { y: [0, -2, 0], rotate: [0, 4, 0] }}
             transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
           />
@@ -69,7 +68,7 @@ export function EmptyCanvas({ onSuggestionClick }: { onSuggestionClick: (text: s
         在上方描述你想要的演示页面，或拖入文档，AI 将帮你分析并生成
       </p>
 
-      <div className="mt-6">
+      <div className="mt-8">
         <p className="mb-3 text-xs font-medium text-[#A8A29E] dark:text-[#78716C]">试试这些</p>
         <motion.div
           className="flex flex-wrap justify-center gap-2"

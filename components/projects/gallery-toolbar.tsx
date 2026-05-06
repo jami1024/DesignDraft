@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowUpDown, Plus, Search, X } from "lucide-react";
+import { ArrowUpDown, Search, X } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 
 import type { ProjectStatus } from "./status-badge";
 
@@ -22,7 +23,6 @@ export function GalleryToolbar({
   onSortToggle,
   statusFilter,
   onStatusFilterChange,
-  onNewProject,
   isLoading,
 }: {
   projectCount: number;
@@ -33,9 +33,10 @@ export function GalleryToolbar({
   onSortToggle: () => void;
   statusFilter: StatusFilter;
   onStatusFilterChange: (f: StatusFilter) => void;
-  onNewProject?: () => void;
   isLoading?: boolean;
 }) {
+  const shouldReduceMotion = useReducedMotion();
+
   const countLabel = isLoading
     ? ""
     : searchQuery.trim() && filteredCount !== projectCount
@@ -44,20 +45,10 @@ export function GalleryToolbar({
 
   return (
     <div className="space-y-2.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2.5">
-          <h2 className="font-serif text-lg font-bold text-[#1C1917] dark:text-[#FAFAF9]">我的项目</h2>
-          <span className="text-sm text-[#78716C] dark:text-[#A8A29E]">{countLabel}</span>
-          {onNewProject && !isLoading && (
-            <button
-              type="button"
-              onClick={onNewProject}
-              className="ml-1 inline-flex h-6 items-center gap-1 rounded-md border border-[#E7E5E4] bg-white px-2 text-[11px] font-semibold text-[#57534E] transition-all duration-150 hover:border-[#D6D3D1] hover:bg-[#F5F5F4] active:scale-95 focus-visible:ring-2 focus-visible:ring-[#3B82F6]/50 focus-visible:ring-offset-2 motion-reduce:active:scale-100 dark:border-[#44403C] dark:bg-[#292524] dark:text-[#D6D3D1] dark:hover:border-[#57534E] dark:hover:bg-[#1C1917]"
-            >
-              <Plus className="h-3 w-3" />
-              新建
-            </button>
-          )}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <h2 className="font-serif text-xl font-bold text-[#1C1917] dark:text-[#FAFAF9]">我的项目</h2>
+          <span className="text-xs text-[#A8A29E] dark:text-[#78716C]">{countLabel}</span>
         </div>
 
         {!isLoading && <div className="ml-auto flex items-center gap-1.5">
@@ -66,13 +57,20 @@ export function GalleryToolbar({
               key={tab.value}
               type="button"
               onClick={() => onStatusFilterChange(tab.value)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#3B82F6]/50 ${
+              className={`relative rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#3B82F6]/50 ${
                 statusFilter === tab.value
-                  ? "bg-[#1C1917] text-white dark:bg-[#FAFAF9] dark:text-[#1C1917]"
-                  : "text-[#78716C] hover:bg-[#F5F5F4] dark:text-[#A8A29E] dark:hover:bg-[#1C1917]"
+                  ? "text-white dark:text-[#1C1917]"
+                  : "text-[#78716C] hover:text-[#44403C] dark:text-[#A8A29E] dark:hover:text-[#D6D3D1]"
               }`}
             >
-              {tab.label}
+              {statusFilter === tab.value && (
+                <motion.span
+                  layoutId="activeFilter"
+                  className="absolute inset-0 rounded-md bg-[#1C1917] dark:bg-[#FAFAF9]"
+                  transition={shouldReduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span className="relative z-10">{tab.label}</span>
             </button>
           ))}
 
@@ -81,7 +79,7 @@ export function GalleryToolbar({
             onClick={onSortToggle}
             className="ml-1 inline-flex items-center gap-1 rounded-md border border-[#E7E5E4] px-2.5 py-1 text-xs font-medium text-[#57534E] transition-colors duration-150 hover:bg-[#F5F5F4] focus-visible:ring-2 focus-visible:ring-[#3B82F6]/50 dark:border-[#44403C] dark:text-[#D6D3D1] dark:hover:bg-[#1C1917]"
           >
-            <ArrowUpDown className="h-3 w-3" />
+            <ArrowUpDown className="h-3 w-3 transition-transform duration-200" style={{ transform: sortBy === "name" ? "rotate(180deg)" : "rotate(0deg)" }} />
             {sortBy === "updatedAt" ? "最近更新" : "名称"}
           </button>
         </div>}

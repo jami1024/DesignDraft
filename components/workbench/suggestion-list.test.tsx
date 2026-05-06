@@ -1,11 +1,12 @@
 import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { PageSuggestion } from "@/types";
 import { SuggestionList } from "./suggestion-list";
 
-const suggestions = [
+const suggestions: PageSuggestion[] = [
   {
     id: "landing-page",
     projectId: "project-1",
@@ -30,51 +31,35 @@ const suggestions = [
   },
 ];
 
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (input.toString() === "/api/documents/analyze" && init?.method === "POST") {
-        return Response.json({ suggestions });
-      }
-      return Response.json({ error: "未匹配请求" }, { status: 500 });
-    }),
-  );
-});
-
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
 });
 
 describe("SuggestionList", () => {
-  it("analyzes the latest document and displays suggestions", async () => {
-    const user = userEvent.setup();
-    render(<SuggestionList projectId="project-1" latestDocumentId="doc-1" />);
-
-    await user.click(screen.getByRole("button", { name: "分析文档" }));
-
-    expect(await screen.findByText("产品介绍落地页")).toBeInTheDocument();
+  it("renders suggestions", () => {
+    render(<SuggestionList suggestions={suggestions} selectedId={null} onSelect={() => {}} />);
+    expect(screen.getByText("产品介绍落地页")).toBeInTheDocument();
     expect(screen.getByText("数据看板页面")).toBeInTheDocument();
     expect(screen.getByText("Modern Minimal")).toBeInTheDocument();
   });
 
-  it("selects a suggestion", async () => {
-    const user = userEvent.setup();
-    render(<SuggestionList projectId="project-1" latestDocumentId="doc-1" />);
-
-    await user.click(screen.getByRole("button", { name: "分析文档" }));
-    await user.click(await screen.findByRole("button", { name: "选择 产品介绍落地页" }));
-
-    expect(screen.getByText("已选择：产品介绍落地页")).toBeInTheDocument();
+  it("highlights selected suggestion", () => {
+    render(<SuggestionList suggestions={suggestions} selectedId="landing-page" onSelect={() => {}} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0].className).toContain("border-[#2563EB]");
   });
 
-  it("prompts for a document before analysis", async () => {
+  it("calls onSelect when clicked", async () => {
+    const onSelect = vi.fn();
     const user = userEvent.setup();
-    render(<SuggestionList projectId="project-1" latestDocumentId={null} />);
+    render(<SuggestionList suggestions={suggestions} selectedId={null} onSelect={onSelect} />);
 
-    await user.click(screen.getByRole("button", { name: "分析文档" }));
+    await user.click(screen.getAllByRole("button")[0]);
+    expect(onSelect).toHaveBeenCalledWith(suggestions[0]);
+  });
 
-    expect(screen.getByText("请先保存文本需求或上传文档")).toBeInTheDocument();
+  it("renders nothing when empty", () => {
+    const { container } = render(<SuggestionList suggestions={[]} selectedId={null} onSelect={() => {}} />);
+    expect(container.innerHTML).toBe("");
   });
 });

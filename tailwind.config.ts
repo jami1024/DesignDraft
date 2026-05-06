@@ -91,11 +91,16 @@ const config: Config = {
           "50%": { backgroundPosition: "100% 50%" },
           "100%": { backgroundPosition: "0% 50%" },
         },
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
       },
       animation: {
         float: "float 6s ease-in-out infinite",
         "pulse-dot": "pulse-dot 3s ease-in-out infinite",
         "gradient-shift": "gradient-shift 8s ease infinite",
+        shimmer: "shimmer 1.5s ease-in-out infinite",
       },
     },
   },

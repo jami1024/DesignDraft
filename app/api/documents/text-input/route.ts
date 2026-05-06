@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 
 import { createTextPreview } from "@/lib/document-parser";
-import { createSourceDocument, getProject, getProjectExtractedPath } from "@/lib/storage";
+import { createSourceDocument, getProject, getProjectExtractedPath, updateProject } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -48,6 +48,8 @@ export async function POST(request: Request) {
     originalPath: extractedTextPath,
     extractedTextPath,
   });
+
+  await updateProject(project.id, { textInput: text });
 
   return NextResponse.json(
     {

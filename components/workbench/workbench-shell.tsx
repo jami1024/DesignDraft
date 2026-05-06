@@ -19,7 +19,7 @@ export function WorkbenchShell({ projectId, initialLatestDocumentId }: Workbench
   return (
     <aside aria-label="项目侧边栏" className="space-y-4">
       <DocumentUpload projectId={projectId} onDocumentSaved={setLatestDocumentId} />
-      <SuggestionList projectId={projectId} latestDocumentId={latestDocumentId} />
+      <SuggestionList suggestions={[]} selectedId={null} onSelect={() => {}} />
       <StyleSelector value={stylePresetId} onChange={setStylePresetId} />
       <div className="rounded-lg border border-warm-border bg-warm-bg px-3 py-2.5 text-xs text-warm-text-muted">
         当前视觉方向：<span className="font-semibold text-warm-text">{stylePresetId}</span>

@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { ArrowRight, Clock, FileText, Layers, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
@@ -72,20 +71,20 @@ export function ProjectCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative block overflow-hidden rounded-xl border border-[#E7E5E4] bg-white p-4 shadow-warm-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3B82F6]/30 hover:shadow-[0_4px_20px_rgba(59,130,246,0.08)] focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 dark:border-[#44403C] dark:bg-[#292524] dark:hover:border-[#60A5FA]/30 dark:hover:shadow-[0_4px_20px_rgba(96,165,250,0.1)]"
+      className="group relative block overflow-hidden rounded-xl border border-[#E7E5E4] bg-white p-5 shadow-warm-xs transition-all duration-300 hover:-translate-y-1 hover:border-[#3B82F6]/20 hover:shadow-[0_8px_30px_rgba(59,130,246,0.10),0_2px_8px_rgba(28,25,23,0.04)] focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 dark:border-[#44403C] dark:bg-[#292524] dark:hover:border-[#60A5FA]/20 dark:hover:shadow-[0_8px_30px_rgba(96,165,250,0.12),0_2px_8px_rgba(0,0,0,0.3)]"
     >
       {isHovered && (
         <div
           className="pointer-events-none absolute inset-0 transition-opacity duration-200"
           style={{
-            background: `radial-gradient(250px circle at ${spotlightPos.x}px ${spotlightPos.y}px, rgba(59,130,246,0.10), transparent 70%)`,
+            background: `radial-gradient(350px circle at ${spotlightPos.x}px ${spotlightPos.y}px, rgba(59,130,246,0.06), transparent 80%)`,
           }}
         />
       )}
 
       <div className="relative">
         <div className="flex items-start gap-3">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${color.bg} ${color.text}`}>
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${color.bg} ${color.text}`}>
             {initial}
           </div>
           <div className="min-w-0 flex-1">
@@ -116,7 +115,7 @@ export function ProjectCard({
           </button>
         </div>
 
-        <div className="mt-3.5 flex items-center gap-3 border-t border-[#F5F5F4] pt-3 text-xs text-[#78716C] dark:border-[#44403C] dark:text-[#A8A29E]">
+        <div className="mt-3.5 flex items-center gap-3 border-t border-[#F5F5F4]/80 pt-3 text-xs text-[#78716C] dark:border-[#44403C] dark:text-[#A8A29E]">
           <span className="inline-flex items-center gap-1">
             <FileText className="h-3 w-3" />
             <span className="font-medium text-[#44403C] dark:text-[#D6D3D1]">{project.sourceDocumentIds.length}</span>
@@ -136,7 +135,7 @@ export function ProjectCard({
 
         <div className="mt-3 flex items-center text-xs font-medium text-[#78716C] transition-colors duration-150 group-hover:text-[#2563EB] dark:text-[#A8A29E] dark:group-hover:text-[#60A5FA]">
           {CTA_MAP[status]}
-          <ArrowRight className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:group-hover:translate-x-0" />
+          <ArrowRight className="ml-1 h-3 w-3 transition-transform duration-300 ease-out group-hover:translate-x-1.5 motion-reduce:group-hover:translate-x-0" />
         </div>
       </div>
     </Link>

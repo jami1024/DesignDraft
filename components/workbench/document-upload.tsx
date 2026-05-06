@@ -11,6 +11,7 @@ type UploadedDocumentSummary = {
 
 type DocumentUploadProps = {
   projectId: string;
+  initialText?: string | null;
   onDocumentSaved?: (documentId: string) => void;
 };
 
@@ -27,8 +28,8 @@ type RecentDocument = {
 
 const MAX_RECENT = 10;
 
-export function DocumentUpload({ projectId, onDocumentSaved }: DocumentUploadProps) {
-  const [text, setText] = useState("");
+export function DocumentUpload({ projectId, initialText, onDocumentSaved }: DocumentUploadProps) {
+  const [text, setText] = useState(initialText ?? "");
   const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);

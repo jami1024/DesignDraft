@@ -26,6 +26,9 @@
   .absolute[aria-hidden="true"] > .rounded-full {
     animation: none !important;
   }
+  .animate-shimmer {
+    animation: none !important;
+  }
 }
 
 @layer base {

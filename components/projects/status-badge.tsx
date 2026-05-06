@@ -27,7 +27,7 @@ export function deriveProjectStatus(docCount: number, pageCount: number): Projec
 export function StatusBadge({ status }: { status: ProjectStatus }) {
   const config = STATUS_CONFIG[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${config.badgeClass}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium leading-none ${config.badgeClass}`}>
       <span className={config.dotClass} />
       {config.label}
     </span>

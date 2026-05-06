@@ -22,21 +22,28 @@ export default async function ProjectWorkbenchPage({ params }: ProjectWorkbenchP
   const latestDocumentId = documents[0]?.id ?? null;
 
   return (
-    <main className="min-h-screen bg-warm-bg text-warm-text">
-      <header className="border-b border-warm-border-soft bg-warm-panel/80 backdrop-blur-sm px-5 py-2.5 sm:px-8">
+    <main className="flex min-h-screen flex-col bg-warm-bg text-warm-text">
+      <header className="sticky top-0 z-20 border-b border-[#E7E5E4]/60 bg-[#FAFAF9]/80 px-5 py-2.5 backdrop-blur-xl transition-colors sm:px-8 dark:border-[#44403C]/40 dark:bg-[#1C1917]/80">
         <div className="mx-auto flex max-w-7xl items-center gap-3">
           <Link
             href="/projects"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-warm-text-soft transition-colors duration-150 hover:bg-warm-subtle hover:text-warm-text focus-visible:ring-2 focus-visible:ring-primary-500/50"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#A8A29E] transition-colors duration-150 hover:bg-[#F5F5F4] hover:text-[#1C1917] focus-visible:ring-2 focus-visible:ring-[#3B82F6]/50 dark:text-[#78716C] dark:hover:bg-[#292524] dark:hover:text-[#FAFAF9]"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
-          <h1 className="truncate font-serif text-sm font-bold text-warm-text sm:text-base">{project.name}</h1>
+          <h1 className="truncate font-serif text-sm font-bold tracking-tight text-[#1C1917] sm:text-base dark:text-[#FAFAF9]">{project.name}</h1>
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-5 py-4 sm:px-8 lg:py-5">
-        <WorkbenchLayout projectId={project.id} initialLatestDocumentId={latestDocumentId} />
+      <div className="flex-1">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <WorkbenchLayout
+            projectId={project.id}
+            projectName={project.name}
+            initialLatestDocumentId={latestDocumentId}
+            initialTextInput={project.textInput ?? null}
+          />
+        </div>
       </div>
     </main>
   );

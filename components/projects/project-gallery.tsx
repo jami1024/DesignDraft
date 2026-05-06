@@ -120,7 +120,7 @@ function DeleteConfirmModal({
   );
 }
 
-export function ProjectGallery({ onSuggestionClick, onProjectCountChange, onNewProject }: { onSuggestionClick: (text: string) => void; onProjectCountChange?: (count: number) => void; onNewProject?: () => void }) {
+export function ProjectGallery({ onSuggestionClick, onProjectCountChange }: { onSuggestionClick: (text: string) => void; onProjectCountChange?: (count: number) => void }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -206,7 +206,6 @@ export function ProjectGallery({ onSuggestionClick, onProjectCountChange, onNewP
         onSortToggle={() => setSortBy((v) => (v === "updatedAt" ? "name" : "updatedAt"))}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        onNewProject={onNewProject}
         isLoading={isLoading}
       />
 
