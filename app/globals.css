@@ -22,11 +22,270 @@
   66% { transform: translate(-25px, 40px); }
 }
 
+@keyframes gen-stack-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes gen-card-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes gen-depth-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.9; }
+}
+
+.gen-stack-float {
+  animation: gen-stack-float 6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.gen-card-breathe {
+  animation: gen-card-breathe 3s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.gen-depth-pulse {
+  animation: gen-depth-pulse 2.5s ease-in-out infinite;
+}
+
+/* --- 消息入场动画 --- */
+@keyframes msg-slide-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes msg-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes msg-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.msg-slide-right { animation: msg-slide-right 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.msg-fade-up { animation: msg-fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.msg-pop { animation: msg-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* --- 思考点阵 --- */
+@keyframes thinking-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+.thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3B82F6;
+  display: inline-block;
+  animation: thinking-bounce 1.4s ease-in-out infinite;
+}
+
+/* --- 版本卡片庆祝 --- */
+@keyframes version-card-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes version-accent-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes version-shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+.version-card-enter {
+  animation: version-card-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  position: relative;
+  overflow: hidden;
+}
+.version-card-enter::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.08), transparent);
+  animation: version-shimmer 0.8s 0.3s ease-out forwards;
+  pointer-events: none;
+}
+.version-accent-grow {
+  animation: version-accent-grow 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top;
+}
+
+/* --- 滚动按钮滑入 --- */
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.slide-up-fade { animation: slide-up-fade 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* --- 输入框渐变边框 --- */
+.input-glow-wrapper {
+  background: linear-gradient(to right, #D6D3D1, #D6D3D1);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.input-glow-wrapper:focus-within {
+  background: linear-gradient(135deg,
+    rgba(59, 130, 246, 0.45),
+    rgba(59, 130, 246, 0.1),
+    rgba(59, 130, 246, 0.45));
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+}
+
+:is(.dark) .input-glow-wrapper {
+  background: linear-gradient(to right, #44403C, #44403C);
+}
+:is(.dark) .input-glow-wrapper:focus-within {
+  background: linear-gradient(135deg,
+    rgba(96, 165, 250, 0.4),
+    rgba(96, 165, 250, 0.1),
+    rgba(96, 165, 250, 0.4));
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.08);
+}
+
+/* --- RequirementComposer 动效 --- */
+@keyframes composer-icon-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes composer-icon-analyze {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(8deg); }
+  75% { transform: rotate(-8deg); }
+}
+@keyframes composer-icon-structure {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(1px, -1px); }
+  66% { transform: translate(-1px, 1px); }
+}
+@keyframes composer-icon-generate {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  50% { transform: scaleX(1.12) scaleY(0.92); }
+}
+@keyframes composer-scan {
+  0% { left: -30%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+@keyframes composer-shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+@keyframes composer-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.96; }
+}
+@keyframes composer-done-flash {
+  0% { border-color: rgba(16, 185, 129, 0.5); }
+  100% { border-color: rgba(16, 185, 129, 0); }
+}
+
+.composer-icon-breathe {
+  animation: composer-icon-breathe 3s ease-in-out infinite;
+  transform-origin: center;
+}
+.composer-icon-analyzing {
+  animation: composer-icon-analyze 2s ease-in-out infinite;
+  transform-origin: center;
+}
+.composer-icon-structuring {
+  animation: composer-icon-structure 1.8s ease-in-out infinite;
+  transform-origin: center;
+}
+.composer-icon-generating {
+  animation: composer-icon-generate 1.5s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.composer-analyzing {
+  animation: composer-breathe 2.5s ease-in-out infinite;
+}
+.composer-structuring::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 20%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.06), transparent);
+  animation: composer-scan 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+.composer-generating::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.08), transparent);
+  animation: composer-shimmer 2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+.composer-done {
+  animation: composer-done-flash 1s ease-out forwards;
+}
+
+@keyframes glow-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 12px 3px rgba(59, 130, 246, 0.4),
+      0 0 28px 6px rgba(59, 130, 246, 0.18);
+    border-color: rgba(59, 130, 246, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 24px 8px rgba(59, 130, 246, 0.6),
+      0 0 56px 16px rgba(59, 130, 246, 0.25);
+    border-color: rgba(96, 165, 250, 0.85);
+  }
+}
+
+.input-glow-active {
+  border: 2px solid rgba(59, 130, 246, 0.6);
+  animation: glow-breathe 2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .absolute[aria-hidden="true"] > .rounded-full {
     animation: none !important;
   }
   .animate-shimmer {
+    animation: none !important;
+  }
+  .input-glow-active::before {
+    animation: none !important;
+  }
+  .gen-stack-float,
+  .gen-card-breathe,
+  .gen-depth-pulse {
+    animation: none !important;
+  }
+  .msg-slide-right,
+  .msg-fade-up,
+  .msg-pop,
+  .thinking-dot,
+  .version-card-enter,
+  .version-card-enter::after,
+  .version-accent-grow,
+  .slide-up-fade {
+    animation: none !important;
+  }
+  .composer-icon-breathe,
+  .composer-icon-analyzing,
+  .composer-icon-structuring,
+  .composer-icon-generating,
+  .composer-analyzing,
+  .composer-structuring::before,
+  .composer-generating::after,
+  .composer-done {
     animation: none !important;
   }
 }
@@ -53,6 +312,12 @@
     --radius: 0.625rem;
     --font-sans: "Noto Sans SC", "Inter", system-ui, sans-serif;
     --font-serif: "Noto Serif SC", Georgia, serif;
+    --gen-card-bg: #FFFFFF;
+    --gen-card-stroke: #E7E5E4;
+    --gen-card-line: #D6D3D1;
+    --gen-card-accent: #3B82F6;
+    --gen-card-shadow: rgba(0, 0, 0, 0.04);
+    --gen-glow-color: rgba(59, 130, 246, 0.08);
   }
 
   .dark {
@@ -73,6 +338,12 @@
     --border: 30 6% 22%;
     --input: 30 6% 22%;
     --ring: 213 94% 68%;
+    --gen-card-bg: #292524;
+    --gen-card-stroke: #44403C;
+    --gen-card-line: #57534E;
+    --gen-card-accent: #60A5FA;
+    --gen-card-shadow: rgba(0, 0, 0, 0.2);
+    --gen-glow-color: rgba(59, 130, 246, 0.12);
   }
 
   * {

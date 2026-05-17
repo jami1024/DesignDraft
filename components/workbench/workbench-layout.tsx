@@ -1,60 +1,208 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, Clock, FileText, Image, Loader2, Paperclip, Sparkles, X } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, ChevronRight, Clock, Eye, FileText, Loader2, MessageSquare, MousePointer2, Sparkles, X } from "lucide-react";
 
-import type { PageSuggestion } from "@/types";
+import html2canvas from "html2canvas";
+import type { SelectedElementInfo } from "@/lib/element-selector";
+import type { ChatAttachment, ChatMessage, DesignDirection, PageSuggestion, PageVersion } from "@/types";
+import { DesignDirectionCards } from "./design-direction-card";
+import { GenerationAnimation } from "./generation-animation";
 import { PreviewPanel } from "./preview-panel";
+import { RequirementComposer } from "./requirement-composer";
+import type { ComposerState } from "./requirement-composer";
+import { ShareDialog } from "./share-dialog";
+import { VersionHistory } from "./version-history";
 
-type Attachment = { name: string; url: string; type: "image" | "file"; size?: string };
+async function captureElementScreenshot(
+  htmlContent: string,
+  currentPreviewPath: string | null,
+  currentPageId: string | null,
+  box: { x: number; y: number; width: number; height: number },
+): Promise<string | null> {
+  const container = document.createElement("div");
+  container.style.cssText = "position:fixed;left:-9999px;top:0;width:1280px;height:800px;overflow:hidden;";
+  document.body.appendChild(container);
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  thinking?: string;
-  suggestions?: PageSuggestion[];
-  generatedVersion?: number;
-  attachments?: Attachment[];
-  timestamp: number;
-};
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "width:1280px;height:800px;border:none;";
+  if (currentPreviewPath && currentPageId) {
+    iframe.src = currentPreviewPath;
+  } else {
+    iframe.srcdoc = htmlContent;
+  }
+  container.appendChild(iframe);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      iframe.addEventListener("load", () => resolve(), { once: true });
+      setTimeout(() => reject(new Error("timeout")), 8000);
+    });
+    await new Promise((r) => setTimeout(r, 600));
+
+    const doc = iframe.contentDocument;
+    if (!doc) return null;
+
+    const fullCanvas = await html2canvas(doc.documentElement, {
+      width: 1280,
+      height: 800,
+      useCORS: true,
+      scale: 1,
+      logging: false,
+      allowTaint: true,
+    });
+
+    const pad = 20;
+    const cx = Math.max(0, Math.round(box.x - pad));
+    const cy = Math.max(0, Math.round(box.y - pad));
+    const cw = Math.min(fullCanvas.width - cx, Math.round(box.width + pad * 2));
+    const ch = Math.min(fullCanvas.height - cy, Math.round(box.height + pad * 2));
+
+    const cropCanvas = document.createElement("canvas");
+    cropCanvas.width = cw;
+    cropCanvas.height = ch;
+    const ctx = cropCanvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(fullCanvas, cx, cy, cw, ch, 0, 0, cw, ch);
+
+    return cropCanvas.toDataURL("image/png");
+  } finally {
+    document.body.removeChild(container);
+  }
+}
 
 type WorkbenchLayoutProps = {
   projectId: string;
   projectName: string;
   initialLatestDocumentId: string | null;
   initialTextInput: string | null;
+  initialPageId: string | null;
+  initialPageName: string | null;
+  initialHtml: string | null;
+  initialVersionCount: number;
+  initialPreviewPath: string | null;
+  initialSuggestion: PageSuggestion | null;
 };
 
-export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentId, initialTextInput }: WorkbenchLayoutProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (initialTextInput) {
-      return [{ id: "init-user", role: "user" as const, content: initialTextInput, timestamp: Date.now() - 5000 }];
-    }
-    return [];
-  });
+export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentId, initialTextInput, initialPageId, initialPageName, initialHtml, initialVersionCount, initialPreviewPath, initialSuggestion }: WorkbenchLayoutProps) {
+  const [mobileTab, setMobileTab] = useState<"chat" | "preview">("chat");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
   const [inputText, setInputText] = useState("");
   const [isThinking, setIsThinking] = useState(false);
-  const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
-  const [versionCount, setVersionCount] = useState(0);
-  const [pageName, setPageName] = useState("预览");
+  const [generatedHtml, setGeneratedHtml] = useState<string | null>(initialHtml);
+  const [versionCount, setVersionCount] = useState(initialVersionCount);
+  const [pageName, setPageName] = useState(initialPageName ?? "预览");
   const [extractedText, setExtractedText] = useState(initialTextInput ?? "");
-  const [selectedSuggestion, setSelectedSuggestion] = useState<PageSuggestion | null>(null);
-  const [needsAnalysis, setNeedsAnalysis] = useState(!!initialTextInput);
-  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<PageSuggestion | null>(initialSuggestion);
+  const [pageId, setPageId] = useState<string | null>(initialPageId);
+  const [previewPath, setPreviewPath] = useState<string | null>(initialPreviewPath);
+  const [generationPhase, setGenerationPhase] = useState<"idle" | "analyzing" | "generating" | "optimizing" | "done">(initialPageId ? "done" : "idle");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedElement, setSelectedElement] = useState<SelectedElementInfo | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [needsAnalysis, setNeedsAnalysis] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSuggestionsRef = useRef<PageSuggestion[]>([]);
+
+  const composerState: ComposerState = useMemo(() => {
+    if (isThinking) {
+      if (generationPhase === "analyzing") return "analyzing";
+      if (generationPhase === "generating") return "structuring";
+      if (generationPhase === "optimizing") return "generating";
+      return "analyzing";
+    }
+    if (generationPhase === "done") return "done";
+    if (inputText.length > 0) return "typing";
+    return "idle";
+  }, [isThinking, generationPhase, inputText]);
+
+  const [displayComposerState, setDisplayComposerState] = useState<ComposerState>("idle");
+  useEffect(() => {
+    setDisplayComposerState(composerState);
+    if (composerState === "done") {
+      const t = setTimeout(() => setDisplayComposerState("idle"), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [composerState]);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }), 50);
   }, []);
 
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowScrollBtn(gap > 120);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const persistMessages = useCallback((msgs: ChatMessage[]) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void fetch(`/api/projects/${projectId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: msgs }),
+      });
+    }, 1000);
+  }, [projectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/messages`);
+        const data = (await res.json()) as { messages?: ChatMessage[] };
+        if (cancelled) return;
+        if (data.messages && data.messages.length > 0) {
+          setMessages(data.messages);
+        } else if (initialTextInput) {
+          const initMsg: ChatMessage = { id: "init-user", role: "user", content: initialTextInput, timestamp: Date.now() };
+          setMessages([initMsg]);
+          if (!initialLatestDocumentId && !initialPageId) {
+            setNeedsAnalysis(true);
+          }
+        }
+      } catch {
+        if (initialTextInput) {
+          setMessages([{ id: "init-user", role: "user", content: initialTextInput, timestamp: Date.now() }]);
+          if (!initialLatestDocumentId && !initialPageId) {
+            setNeedsAnalysis(true);
+          }
+        }
+      } finally {
+        if (!cancelled) setMessagesLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId, initialTextInput, initialLatestDocumentId, initialPageId]);
+
+  const skipNextPersistRef = useRef(true);
+  useEffect(() => {
+    if (!messagesLoaded) return;
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
+    if (messages.length > 0) {
+      persistMessages(messages);
+    }
+  }, [messages, messagesLoaded, persistMessages]);
+
   useEffect(() => { scrollToBottom(); }, [messages.length, scrollToBottom]);
 
   const analyzeText = useCallback(async (text: string) => {
     setIsThinking(true);
+    setGenerationPhase("analyzing");
     try {
       let docId = initialLatestDocumentId;
       if (text.trim()) {
@@ -73,9 +221,20 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, documentId: docId }),
       });
-      const body = (await res.json()) as { suggestions?: PageSuggestion[] };
+      const body = (await res.json()) as { designDirections?: DesignDirection[]; suggestions?: PageSuggestion[] };
+      const directions = body.designDirections ?? [];
       const suggestions = body.suggestions ?? [];
-      if (suggestions.length > 0) {
+      if (directions.length > 0) {
+        pendingSuggestionsRef.current = suggestions;
+        setMessages((prev) => [...prev, {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: "我分析了你的需求，先为项目选择一个设计方向吧：",
+          thinking: "分析需求中…",
+          designDirections: directions,
+          timestamp: Date.now(),
+        }]);
+      } else if (suggestions.length > 0) {
         setMessages((prev) => [...prev, {
           id: `a-${Date.now()}`,
           role: "assistant",
@@ -101,6 +260,7 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
       }]);
     } finally {
       setIsThinking(false);
+      setGenerationPhase("idle");
     }
   }, [projectId, initialLatestDocumentId]);
 
@@ -109,12 +269,14 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
       setNeedsAnalysis(false);
       void analyzeText(initialTextInput);
     }
-  }, [needsAnalysis, initialTextInput, analyzeText]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsAnalysis, initialTextInput]);
 
   const generateFromSuggestion = useCallback(async (suggestion: PageSuggestion) => {
     setSelectedSuggestion(suggestion);
     setPageName(suggestion.name);
     setIsThinking(true);
+    setGenerationPhase("generating");
     setMessages((prev) => [...prev, {
       id: `sys-gen-${Date.now()}`,
       role: "assistant",
@@ -127,7 +289,7 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
       const res = await fetch("/api/pages/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, extractedText, suggestion, stylePreset: "modern-minimal" }),
+        body: JSON.stringify({ projectId, extractedText, suggestion }),
       });
 
       let html = "";
@@ -141,26 +303,38 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
           for (const line of text.split("\n")) {
             if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
             try {
-              const data = JSON.parse(line.slice(6)) as { chunk?: string; error?: string };
-              if (data.chunk) { html += data.chunk; setGeneratedHtml(html); }
+              const data = JSON.parse(line.slice(6)) as { chunk?: string; error?: string; done?: boolean; pageId?: string; versionId?: string; versionNumber?: number; previewPath?: string };
+              if (data.chunk) {
+                html += data.chunk;
+                const cleaned = stripMarkdownFences(html);
+                if (cleaned) setGeneratedHtml(cleaned);
+              }
+              if (data.done && data.pageId) {
+                setPageId(data.pageId);
+                setPreviewPath(data.previewPath ?? null);
+                setVersionCount(data.versionNumber ?? 1);
+              }
               if (data.error) throw new Error(data.error);
-            } catch { /* skip parse errors */ }
+            } catch (e) {
+              if (e instanceof Error && e.message !== "生成失败") throw e;
+            }
           }
         }
       }
 
-      setVersionCount(1);
+      setGenerationPhase("done");
       setMessages((prev) => {
         const filtered = prev.filter((m) => !m.id.startsWith("sys-gen-"));
         return [...filtered, {
           id: `a-${Date.now()}`,
           role: "assistant",
           content: `已生成「${suggestion.name}」。你可以告诉我需要修改什么。`,
-          generatedVersion: 1,
+          generatedVersion: versionCount || 1,
           timestamp: Date.now(),
         }];
       });
     } catch {
+      setGenerationPhase("idle");
       setMessages((prev) => {
         const filtered = prev.filter((m) => !m.id.startsWith("sys-gen-"));
         return [...filtered, { id: `a-${Date.now()}`, role: "assistant", content: "页面生成失败，请重试。", timestamp: Date.now() }];
@@ -168,20 +342,85 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
     } finally {
       setIsThinking(false);
     }
-  }, [projectId, extractedText]);
+  }, [projectId, extractedText, versionCount]);
 
-  const optimizePage = useCallback(async (instruction: string) => {
+  const optimizePage = useCallback(async (instruction: string, imageUrls: string[] = []) => {
     if (!generatedHtml || !selectedSuggestion) return;
     setIsThinking(true);
+    setGenerationPhase("optimizing");
 
     try {
+      const attachmentImages: string[] = [];
+      for (const url of imageUrls) {
+        try {
+          const resp = await fetch(url);
+          const blob = await resp.blob();
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          attachmentImages.push(dataUrl);
+        } catch { /* ignore */ }
+      }
+
+      const history = messages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+      const payload: Record<string, unknown> = {
+        projectId, pageId, extractedText,
+        versionId: `v${versionCount}`,
+        suggestion: selectedSuggestion,
+        currentHtml: generatedHtml,
+        instruction,
+        history,
+        ...(attachmentImages.length > 0 ? { attachmentImages } : {}),
+      };
+      if (selectedElement) {
+        const selPayload: Record<string, unknown> = {
+          html: selectedElement.html,
+          path: selectedElement.path,
+          text: selectedElement.text,
+          stableId: selectedElement.stableId,
+        };
+
+        let marked = false;
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(generatedHtml, "text/html");
+          const target = doc.querySelector(selectedElement.path);
+          if (target) {
+            target.setAttribute("data-dd-target", "true");
+            payload.currentHtml = `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
+            marked = true;
+          }
+        } catch { /* ignore */ }
+        if (!marked && selectedElement.html) {
+          const snippet = selectedElement.html.slice(0, 200);
+          const tagEnd = snippet.indexOf(">");
+          if (tagEnd > 0) {
+            const markedSnippet = snippet.slice(0, tagEnd) + ' data-dd-target="true"' + snippet.slice(tagEnd);
+            const replaced = generatedHtml.replace(snippet, markedSnippet);
+            if (replaced !== generatedHtml) {
+              payload.currentHtml = replaced;
+            }
+          }
+        }
+
+        try {
+          const shot = await captureElementScreenshot(generatedHtml, previewPath, pageId, selectedElement.boundingBox);
+          if (shot) selPayload.screenshot = shot;
+        } catch { /* 截图失败不阻塞优化 */ }
+
+        payload.selectedElement = selPayload;
+      }
       const res = await fetch("/api/pages/optimize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, extractedText, suggestion: selectedSuggestion, currentHtml: generatedHtml, instruction }),
+        body: JSON.stringify(payload),
       });
 
-      let html = "";
+      let rawOutput = "";
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       if (reader) {
@@ -192,28 +431,104 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
           for (const line of text.split("\n")) {
             if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
             try {
-              const data = JSON.parse(line.slice(6)) as { chunk?: string; error?: string };
-              if (data.chunk) { html += data.chunk; setGeneratedHtml(html); }
+              const data = JSON.parse(line.slice(6)) as { chunk?: string; error?: string; done?: boolean; pageId?: string; versionId?: string; versionNumber?: number; previewPath?: string };
+              if (data.chunk) {
+                rawOutput += data.chunk;
+                if (!rawOutput.trimStart().startsWith("[TEXT]")) {
+                  const cleaned = stripMarkdownFences(rawOutput);
+                  if (cleaned) setGeneratedHtml(cleaned);
+                }
+              }
+              if (data.done && data.previewPath) {
+                setPreviewPath(data.previewPath);
+                setVersionCount(data.versionNumber ?? versionCount + 1);
+              }
               if (data.error) throw new Error(data.error);
-            } catch { /* skip */ }
+            } catch (e) {
+              if (e instanceof Error && e.message !== "优化失败") throw e;
+            }
           }
         }
       }
 
-      setVersionCount((v) => v + 1);
-      setMessages((prev) => [...prev, {
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        content: `已修改：「${instruction}」。`,
-        generatedVersion: versionCount + 1,
-        timestamp: Date.now(),
-      }]);
+      setGenerationPhase("done");
+      const isTextResponse = rawOutput.trimStart().startsWith("[TEXT]");
+      if (isTextResponse) {
+        const textContent = rawOutput.trimStart().replace(/^\[TEXT\]\s*/, "");
+        setMessages((prev) => [...prev, {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: textContent,
+          timestamp: Date.now(),
+        }]);
+      } else {
+        setMessages((prev) => [...prev, {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: `已修改：「${instruction}」。`,
+          generatedVersion: versionCount + 1,
+          timestamp: Date.now(),
+        }]);
+      }
     } catch {
+      setGenerationPhase("done");
       setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", content: "修改失败，请重试。", timestamp: Date.now() }]);
     } finally {
       setIsThinking(false);
     }
-  }, [projectId, extractedText, generatedHtml, selectedSuggestion, versionCount]);
+  }, [projectId, pageId, extractedText, generatedHtml, selectedSuggestion, versionCount, messages]);
+
+  const handleScreenshot = useCallback(async () => {
+    if (!generatedHtml) return;
+    const container = document.createElement("div");
+    container.style.cssText = "position:fixed;left:-9999px;top:0;width:1280px;height:800px;overflow:hidden;";
+    document.body.appendChild(container);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "width:1280px;height:800px;border:none;";
+
+    const usePreviewUrl = previewPath && pageId;
+    if (usePreviewUrl) {
+      iframe.src = previewPath;
+    } else {
+      iframe.srcdoc = generatedHtml;
+    }
+    container.appendChild(iframe);
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        iframe.addEventListener("load", () => resolve(), { once: true });
+        setTimeout(() => reject(new Error("timeout")), 8000);
+      });
+      await new Promise((r) => setTimeout(r, 800));
+
+      const doc = iframe.contentDocument;
+      if (!doc) throw new Error("无法访问页面内容");
+
+      const canvas = await html2canvas(doc.documentElement, {
+        width: 1280,
+        height: 800,
+        useCORS: true,
+        scale: 1,
+        logging: false,
+        allowTaint: true,
+      });
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        setPendingAttachments((prev) => [...prev, { name: "截图.png", url, type: "image" }]);
+      }
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: `sys-${Date.now()}`,
+        role: "assistant",
+        content: "截图失败，请使用系统截图工具代替。",
+        timestamp: Date.now(),
+      }]);
+    } finally {
+      document.body.removeChild(container);
+    }
+  }, [generatedHtml, previewPath, pageId]);
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -244,30 +559,134 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
     setPendingAttachments([]);
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
-    if (inputRef.current) inputRef.current.style.height = "auto";
 
+    const imageUrls = userMsg.attachments?.filter((a) => a.type === "image").map((a) => a.url) ?? [];
     if (!generatedHtml && !selectedSuggestion) {
       void analyzeText(text);
     } else if (generatedHtml) {
-      void optimizePage(text);
+      void optimizePage(text, imageUrls);
+      setSelectedElement(null);
     }
   }, [inputText, isThinking, pendingAttachments, generatedHtml, selectedSuggestion, analyzeText, optimizePage]);
+
+  const handleElementSelected = useCallback((info: SelectedElementInfo) => {
+    setSelectedElement(info);
+    setSelectionMode(false);
+    setMessages((prev) => [...prev, {
+      id: `sys-sel-${Date.now()}`,
+      role: "system",
+      content: `已选中元素：<${info.tagName}> ${info.text ? `"${info.text.slice(0, 60)}"` : ""}`,
+      timestamp: Date.now(),
+    }]);
+  }, []);
+
+  const handleRollback = useCallback((version: PageVersion, html: string) => {
+    setGeneratedHtml(html);
+    setVersionCount(version.versionNumber);
+    setPreviewPath(version.previewPath);
+    setMessages((prev) => [...prev, {
+      id: `a-rb-${Date.now()}`,
+      role: "assistant",
+      content: `已回退到 v${version.versionNumber}。`,
+      generatedVersion: version.versionNumber,
+      timestamp: Date.now(),
+    }]);
+  }, []);
+
+  const handleDirectionSelect = useCallback(async (direction: DesignDirection) => {
+    setSelectedDirectionId(direction.id);
+    setMessages((prev) => [...prev, {
+      id: `u-dir-${Date.now()}`,
+      role: "user",
+      content: `选择了「${direction.name}」`,
+      timestamp: Date.now(),
+    }]);
+
+    try {
+      await fetch(`/api/projects/${projectId}/design-direction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction }),
+      });
+    } catch { /* non-critical */ }
+
+    const suggestions = pendingSuggestionsRef.current;
+    if (suggestions.length > 0) {
+      setMessages((prev) => [...prev, {
+        id: `a-sug-${Date.now()}`,
+        role: "assistant",
+        content: "设计方向已确定，选择一个页面方案开始生成：",
+        suggestions,
+        timestamp: Date.now(),
+      }]);
+      pendingSuggestionsRef.current = [];
+    }
+  }, [projectId]);
 
   const handleSuggestionClick = useCallback((suggestion: PageSuggestion) => {
     setMessages((prev) => [...prev, { id: `u-pick-${Date.now()}`, role: "user", content: `生成「${suggestion.name}」`, timestamp: Date.now() }]);
     void generateFromSuggestion(suggestion);
   }, [generateFromSuggestion]);
 
+  function stripMarkdownFences(raw: string): string {
+    let html = raw.replace(/```(?:html|HTML)?\s*\n?/g, "").replace(/\n?```/g, "");
+    const doctype = html.search(/<!doctype\b/i);
+    const htmlTag = html.indexOf("<html");
+    const start = doctype !== -1 ? doctype : htmlTag;
+    if (start > 0) return html.slice(start);
+    if (start === 0) return html;
+    return "";
+  }
+
   function formatTime(ts: number) {
     return new Date(ts).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
   }
 
+  function dayKey(ts: number) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }
+
+  function formatDate(ts: number) {
+    return new Date(ts).toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
+  }
+
   return (
-    <div className="grid h-[calc(100vh-57px)] grid-cols-1 lg:grid-cols-[360px_1fr]">
+    <div className="flex h-[calc(100vh-57px)] flex-col">
+      {/* 移动端 tab 栏 */}
+      <div className="flex shrink-0 border-b border-[#E7E5E4] bg-white lg:hidden dark:border-[#44403C] dark:bg-[#292524]">
+        <button
+          type="button"
+          onClick={() => setMobileTab("chat")}
+          className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
+            mobileTab === "chat"
+              ? "border-b-2 border-[#2563EB] text-[#2563EB] dark:border-[#60A5FA] dark:text-[#60A5FA]"
+              : "text-[#78716C] dark:text-[#A8A29E]"
+          }`}
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          对话
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab("preview")}
+          className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
+            mobileTab === "preview"
+              ? "border-b-2 border-[#2563EB] text-[#2563EB] dark:border-[#60A5FA] dark:text-[#60A5FA]"
+              : "text-[#78716C] dark:text-[#A8A29E]"
+          }`}
+        >
+          <Eye className="h-3.5 w-3.5" />
+          预览
+        </button>
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[360px_1fr]">
       {/* 对话侧栏 */}
-      <aside className="flex flex-col border-r border-[#E7E5E4] bg-white dark:border-[#44403C] dark:bg-[#292524]">
+      <aside className={`${mobileTab === "chat" ? "flex" : "hidden"} h-full flex-col overflow-hidden border-r border-[#E7E5E4] bg-white lg:flex dark:border-[#44403C] dark:bg-[#292524]`}>
         {/* 消息区 */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div className="relative flex-1 overflow-hidden">
+        <div ref={scrollRef} className="h-full overflow-y-auto">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
               <Sparkles className="h-8 w-8 text-[#D6D3D1] dark:text-[#57534E]" />
@@ -276,167 +695,215 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
             </div>
           )}
 
-          <div className="space-y-0.5 px-4 py-4">
-            {messages.map((msg) => (
-              <div key={msg.id} className="py-2">
-                {msg.role === "user" ? (
-                  <div className="flex justify-end">
-                    <div className="max-w-[85%] space-y-2">
-                      {msg.attachments?.filter((a) => a.type === "image").map((a, i) => (
-                        <div key={i} className="flex justify-end">
-                          <img src={a.url} alt={a.name} className="max-h-32 rounded-lg" />
-                        </div>
-                      ))}
-                      {msg.attachments?.filter((a) => a.type === "file").map((a, i) => (
-                        <div key={i} className="flex justify-end">
-                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#292524] px-3 py-1.5 text-xs text-[#D6D3D1] dark:bg-[#44403C]">
-                            <FileText className="h-3 w-3" />{a.name}<span className="text-[#78716C]">{a.size}</span>
-                          </span>
-                        </div>
-                      ))}
-                      {msg.content && (
-                        <div className="rounded-2xl rounded-br-md bg-[#1C1917] px-3.5 py-2 text-sm leading-relaxed text-white dark:bg-[#FAFAF9] dark:text-[#1C1917]">
-                          {msg.content}
-                        </div>
-                      )}
+          <div className="relative space-y-1 px-4 py-4">
+            {messages.map((msg, idx) => {
+              const prevMsg = messages[idx - 1];
+              const showDateSep = idx === 0 || (prevMsg && dayKey(prevMsg.timestamp) !== dayKey(msg.timestamp));
+              return (
+                <React.Fragment key={msg.id}>
+                  {showDateSep && (
+                    <div className="flex items-center gap-3 py-5">
+                      <div className="h-px flex-1 bg-[#E7E5E4] dark:bg-[#44403C]" />
+                      <span className="text-[10px] font-medium text-[#A8A29E] dark:text-[#78716C]">{formatDate(msg.timestamp)}</span>
+                      <div className="h-px flex-1 bg-[#E7E5E4] dark:bg-[#44403C]" />
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {msg.thinking && (
-                      <p className="flex items-center gap-1.5 text-xs text-[#A8A29E] dark:text-[#78716C]">
-                        <Sparkles className="h-3 w-3" />
-                        {msg.thinking}
-                      </p>
-                    )}
+                  )}
+                  <div className={`py-2 ${msg.role === "user" ? "msg-slide-right" : msg.role === "system" ? "msg-pop" : "msg-fade-up"}`}>
+                    {msg.role === "system" ? (
+                      <div className="flex items-center gap-2 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 dark:border-[#1E40AF]/40 dark:bg-[#1E3A8A]/20">
+                        <MousePointer2 className="h-3.5 w-3.5 shrink-0 text-[#2563EB] dark:text-[#60A5FA]" />
+                        <span className="text-xs text-[#1E40AF] dark:text-[#93C5FD]">{msg.content}</span>
+                      </div>
+                    ) : msg.role === "user" ? (
+                      <div className="flex justify-end">
+                        <div className="max-w-[85%] space-y-2">
+                          {msg.attachments?.filter((a) => a.type === "image").map((a, i) => (
+                            <div key={i} className="flex justify-end">
+                              <img src={a.url} alt={a.name} className="max-h-32 rounded-lg" />
+                            </div>
+                          ))}
+                          {msg.attachments?.filter((a) => a.type === "file").map((a, i) => (
+                            <div key={i} className="flex justify-end">
+                              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#292524] px-3 py-1.5 text-xs text-[#D6D3D1] dark:bg-[#44403C]">
+                                <FileText className="h-3 w-3" />{a.name}<span className="text-[#78716C]">{a.size}</span>
+                              </span>
+                            </div>
+                          ))}
+                          {msg.content && (
+                            <div className="rounded-2xl rounded-br-md bg-[#1C1917] px-3.5 py-2 text-sm leading-relaxed text-white dark:bg-[#FAFAF9] dark:text-[#1C1917]">
+                              {msg.content}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {msg.thinking && (
+                          <details className="group">
+                            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-[#A8A29E] dark:text-[#78716C]">
+                              <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+                              <Sparkles className="h-3 w-3" />
+                              <span className="truncate">{msg.thinking.length > 60 ? `${msg.thinking.slice(0, 60)}…` : msg.thinking}</span>
+                            </summary>
+                            <p className="mt-1 rounded-md bg-[#FAFAF9] px-3 py-2 text-xs leading-relaxed text-[#78716C] dark:bg-[#1C1917] dark:text-[#A8A29E]">{msg.thinking}</p>
+                          </details>
+                        )}
 
-                    {msg.generatedVersion && (
-                      <div className="flex items-center gap-2 rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] px-3 py-2 dark:border-[#44403C] dark:bg-[#1C1917]">
-                        <FileText className="h-3.5 w-3.5 text-[#A8A29E]" />
-                        <span className="text-xs font-medium text-[#1C1917] dark:text-[#FAFAF9]">{pageName}</span>
-                        <span className="rounded bg-[#E7E5E4] px-1.5 py-0.5 text-[10px] font-medium text-[#78716C] dark:bg-[#44403C] dark:text-[#A8A29E]">v{msg.generatedVersion}</span>
+                        {msg.generatedVersion && (
+                          <div className="version-card-enter flex items-stretch gap-0 rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] dark:border-[#44403C] dark:bg-[#1C1917]">
+                            <div className="version-accent-grow w-1 shrink-0 rounded-l-lg bg-[#3B82F6]" />
+                            <div className="flex items-center gap-2 px-3 py-2">
+                              <FileText className="h-3.5 w-3.5 text-[#3B82F6]" />
+                              <span className="text-xs font-medium text-[#1C1917] dark:text-[#FAFAF9]">{pageName}</span>
+                              <span className="rounded bg-[#DBEAFE] px-1.5 py-0.5 text-[10px] font-medium text-[#2563EB] dark:bg-[#1E3A8A] dark:text-[#93C5FD]">v{msg.generatedVersion}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <p className="text-sm leading-relaxed text-[#1C1917] dark:text-[#FAFAF9]">{msg.content}</p>
+
+                        {msg.designDirections && msg.designDirections.length > 0 && (
+                          <div className="mt-1">
+                            <DesignDirectionCards
+                              directions={msg.designDirections}
+                              onSelect={handleDirectionSelect}
+                              selectedId={selectedDirectionId ?? undefined}
+                            />
+                          </div>
+                        )}
+
+                        {msg.suggestions && (
+                          <div className="mt-1 space-y-1.5">
+                            {msg.suggestions.map((s, sIdx) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => handleSuggestionClick(s)}
+                                style={{ animationDelay: `${sIdx * 0.08}s` }}
+                                className="msg-fade-up w-full rounded-lg border border-[#E7E5E4] px-3 py-2 text-left transition-colors hover:bg-[#F5F5F4] dark:border-[#44403C] dark:hover:bg-[#1C1917]"
+                              >
+                                <span className="text-sm font-medium text-[#1C1917] dark:text-[#FAFAF9]">{s.name}</span>
+                                <p className="mt-0.5 text-xs text-[#78716C] dark:text-[#A8A29E]">{s.purpose}</p>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 text-[11px] text-[#D6D3D1] dark:text-[#57534E]">
+                          <Clock className="h-3 w-3" />
+                          {formatTime(msg.timestamp)}
+                        </div>
                       </div>
                     )}
-
-                    <p className="text-sm leading-relaxed text-[#1C1917] dark:text-[#FAFAF9]">{msg.content}</p>
-
-                    {msg.suggestions && (
-                      <div className="mt-1 space-y-1.5">
-                        {msg.suggestions.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => handleSuggestionClick(s)}
-                            className="w-full rounded-lg border border-[#E7E5E4] px-3 py-2 text-left transition-colors hover:bg-[#F5F5F4] dark:border-[#44403C] dark:hover:bg-[#1C1917]"
-                          >
-                            <span className="text-sm font-medium text-[#1C1917] dark:text-[#FAFAF9]">{s.name}</span>
-                            <p className="mt-0.5 text-xs text-[#78716C] dark:text-[#A8A29E]">{s.purpose}</p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 text-[11px] text-[#D6D3D1] dark:text-[#57534E]">
-                      <Clock className="h-3 w-3" />
-                      {formatTime(msg.timestamp)}
-                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                </React.Fragment>
+              );
+            })}
 
             {isThinking && (
-              <div className="py-2">
-                <div className="flex items-center gap-2 text-xs text-[#A8A29E] dark:text-[#78716C]">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  思考中…
+              <div className="msg-fade-up py-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-1">
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" style={{ animationDelay: "0.15s" }} />
+                    <span className="thinking-dot" style={{ animationDelay: "0.3s" }} />
+                  </div>
+                  <span className="text-xs text-[#A8A29E] dark:text-[#78716C]">思考中</span>
                 </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* 底部输入 */}
-        <div className="border-t border-[#E7E5E4] px-4 py-3 dark:border-[#44403C]">
-          {pendingAttachments.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {pendingAttachments.map((a, i) => (
-                <div key={i} className="group relative">
-                  {a.type === "image" ? (
-                    <img src={a.url} alt={a.name} className="h-16 w-16 rounded-lg object-cover" />
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#F5F5F4] px-2.5 py-1.5 text-xs text-[#57534E] dark:bg-[#1C1917] dark:text-[#A8A29E]">
-                      <FileText className="h-3 w-3" />{a.name}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removePendingAttachment(i)}
-                    className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1C1917] text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-[#FAFAF9] dark:text-[#1C1917]"
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex items-end gap-2">
-            <div className="flex shrink-0 items-center gap-0.5 pb-1.5">
-              <button type="button" onClick={() => imageInputRef.current?.click()} disabled={isThinking} className="rounded-md p-1.5 text-[#A8A29E] transition-colors hover:bg-[#F5F5F4] hover:text-[#57534E] disabled:opacity-50 dark:text-[#78716C] dark:hover:bg-[#1C1917]" title="上传图片">
-                <Image className="h-4 w-4" />
-              </button>
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isThinking} className="rounded-md p-1.5 text-[#A8A29E] transition-colors hover:bg-[#F5F5F4] hover:text-[#57534E] disabled:opacity-50 dark:text-[#78716C] dark:hover:bg-[#1C1917]" title="上传文件">
-                <Paperclip className="h-4 w-4" />
-              </button>
-              <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-              <input ref={fileInputRef} type="file" accept=".md,.txt,.pdf,.docx" className="hidden" onChange={handleFileSelect} />
-            </div>
-            <textarea
-              ref={inputRef}
-              value={inputText}
-              onChange={(e) => { setInputText(e.target.value); e.target.style.height = "auto"; e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`; }}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder="提出后续问题…"
-              rows={1}
-              disabled={isThinking}
-              className="flex-1 resize-none overflow-hidden rounded-xl border border-[#E7E5E4] bg-[#FAFAF9] px-3.5 py-2.5 text-sm leading-relaxed text-[#1C1917] outline-none transition-colors placeholder:text-[#A8A29E] focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6]/20 disabled:opacity-50 dark:border-[#44403C] dark:bg-[#1C1917] dark:text-[#FAFAF9]"
-            />
+        </div>
+          {showScrollBtn && (
             <button
               type="button"
-              onClick={handleSend}
-              disabled={(!inputText.trim() && pendingAttachments.length === 0) || isThinking}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2563EB] text-white transition-colors hover:bg-[#1D4ED8] disabled:opacity-30"
+              onClick={scrollToBottom}
+              className="slide-up-fade absolute bottom-2 left-1/2 z-10 flex items-center gap-1 rounded-full bg-[#1C1917]/80 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm hover:bg-[#1C1917] dark:bg-[#FAFAF9]/80 dark:text-[#1C1917] dark:hover:bg-[#FAFAF9]"
             >
-              <ArrowUp className="h-4 w-4" />
+              <ArrowDown className="h-3 w-3" />
+              最新
             </button>
-          </div>
+          )}
         </div>
-      </aside>
 
-      {/* 预览区 */}
-      <div className="flex flex-col overflow-hidden bg-[#F5F5F4] dark:bg-[#0C0A09]">
-        {generatedHtml ? (
-          <PreviewPanel html={generatedHtml} pageName={pageName} versionNumber={versionCount} />
-        ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <div className="text-center">
-              {isThinking ? (
-                <>
-                  <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#2563EB]" />
-                  <p className="mt-4 text-sm text-[#78716C]">正在处理…</p>
-                </>
-              ) : (
-                <>
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7E5E4]/30 dark:bg-[#292524]">
-                    <FileText className="h-7 w-7 text-[#D6D3D1] dark:text-[#57534E]" />
-                  </div>
-                  <p className="mt-4 text-sm font-medium text-[#78716C]">页面预览</p>
-                  <p className="mt-1 text-xs text-[#A8A29E]">在左侧描述你的需求开始</p>
-                </>
-              )}
-            </div>
+        {/* 版本历史 */}
+        {pageId && (
+          <div className="max-h-48 shrink-0 overflow-y-auto border-t border-[#E7E5E4] bg-[#FAFAF9] px-4 py-2 dark:border-[#44403C] dark:bg-[#1C1917]">
+            <VersionHistory
+              projectId={projectId}
+              pageId={pageId}
+              currentVersionId={`v${versionCount}`}
+              onRollback={handleRollback}
+            />
           </div>
         )}
+
+      </aside>
+
+      {/* 预览区 + 输入框 */}
+      <div className={`${mobileTab === "preview" ? "flex" : "hidden"} flex-col overflow-hidden bg-[#F5F5F4] lg:flex dark:bg-[#0C0A09]`}>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {generatedHtml ? (
+            <PreviewPanel
+              html={generatedHtml}
+              pageName={pageName}
+              versionNumber={versionCount}
+              previewPath={previewPath}
+              generationPhase={generationPhase}
+              selectionMode={selectionMode}
+              onSelectionModeToggle={setSelectionMode}
+              onElementSelected={handleElementSelected}
+              onShareClick={pageId ? () => setShareDialogOpen(true) : undefined}
+              onScreenshot={generatedHtml ? handleScreenshot : undefined}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                {isThinking ? (
+                  <GenerationAnimation phase={generationPhase} />
+                ) : (
+                  <>
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7E5E4]/30 dark:bg-[#292524]">
+                      <FileText className="h-7 w-7 text-[#D6D3D1] dark:text-[#57534E]" />
+                    </div>
+                    <p className="mt-4 text-sm font-medium text-[#78716C]">页面预览</p>
+                    <p className="mt-1 text-xs text-[#A8A29E]">在左侧描述你的需求开始</p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 底部输入框 */}
+        <RequirementComposer
+          value={inputText}
+          onChange={setInputText}
+          onSubmit={handleSend}
+          composerState={displayComposerState}
+          selectedElement={selectedElement}
+          onClearElement={() => setSelectedElement(null)}
+          pendingAttachments={pendingAttachments}
+          onRemoveAttachment={removePendingAttachment}
+          onImageSelect={handleImageSelect}
+          onFileSelect={handleFileSelect}
+          onPasteImage={(file) => {
+            const url = URL.createObjectURL(file);
+            setPendingAttachments((prev) => [...prev, { name: file.name || "粘贴图片.png", url, type: "image" }]);
+          }}
+        />
+      </div>
+
+      {pageId && (
+        <ShareDialog
+          open={shareDialogOpen}
+          onClose={() => setShareDialogOpen(false)}
+          projectId={projectId}
+          pageId={pageId}
+          currentVersionId={`v${versionCount}`}
+        />
+      )}
       </div>
     </div>
   );

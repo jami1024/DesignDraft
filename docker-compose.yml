@@ -5,14 +5,18 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - .env.local
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
       DESIGNDRAFT_WORKSPACE_DIR: /app/.workspace
       DESIGNDRAFT_AGENT_PROVIDER: ${DESIGNDRAFT_AGENT_PROVIDER:-mock}
-      DESIGNDRAFT_AGENT_MODEL: ${DESIGNDRAFT_AGENT_MODEL:-}
+      DESIGNDRAFT_AGENT_MODEL: ${DESIGNDRAFT_AGENT_MODEL:-deepseek-v4-flash}
+      DESIGNDRAFT_AGENT_REASONING_MODEL: ${DESIGNDRAFT_AGENT_REASONING_MODEL:-deepseek-v4-pro}
       DESIGNDRAFT_AGENT_BASE_URL: ${DESIGNDRAFT_AGENT_BASE_URL:-}
       DESIGNDRAFT_AGENT_API_KEY: ${DESIGNDRAFT_AGENT_API_KEY:-}
+      DESIGNDRAFT_AUTH_TOKEN: ${DESIGNDRAFT_AUTH_TOKEN:-}
     volumes:
       - designdraft_workspace:/app/.workspace
     restart: unless-stopped
