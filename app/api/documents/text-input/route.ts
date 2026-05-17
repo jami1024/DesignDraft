@@ -30,6 +30,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "文本需求不能为空" }, { status: 400 });
   }
 
+  if (body.text.length > 100_000) {
+    return NextResponse.json({ error: "文本内容过长，最多 100,000 字符" }, { status: 413 });
+  }
+
   const project = await getProject(body.projectId);
   if (!project) {
     return NextResponse.json({ error: "项目不存在" }, { status: 404 });

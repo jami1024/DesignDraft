@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { WorkbenchLayout } from "@/components/workbench/workbench-layout";
-import { getProject, listSourceDocuments } from "@/lib/storage";
+import { getPage, getPageVersion, getProject, listPageSuggestions, listSourceDocuments, readPageHtml } from "@/lib/storage";
 
 type ProjectWorkbenchPageProps = {
   params: {
@@ -18,8 +18,35 @@ export default async function ProjectWorkbenchPage({ params }: ProjectWorkbenchP
     notFound();
   }
 
-  const [documents] = await Promise.all([listSourceDocuments(project.id)]);
+  const documents = await listSourceDocuments(project.id);
   const latestDocumentId = documents[0]?.id ?? null;
+
+  const lastPageId = project.pageIds[project.pageIds.length - 1] ?? null;
+  let initialPageId: string | null = null;
+  let initialPageName: string | null = null;
+  let initialHtml: string | null = null;
+  let initialVersionCount = 0;
+  let initialPreviewPath: string | null = null;
+  let initialSuggestion: import("@/types").PageSuggestion | null = null;
+
+  if (lastPageId) {
+    const page = await getPage(project.id, lastPageId);
+    if (page) {
+      const [version, html, suggestions] = await Promise.all([
+        getPageVersion(project.id, page.id, page.currentVersionId),
+        readPageHtml(project.id, page.id, page.currentVersionId),
+        listPageSuggestions(project.id),
+      ]);
+      if (version && html) {
+        initialPageId = page.id;
+        initialPageName = page.name;
+        initialHtml = html;
+        initialVersionCount = version.versionNumber;
+        initialPreviewPath = version.previewPath;
+        initialSuggestion = suggestions.find((s) => s.id === page.suggestionId) ?? null;
+      }
+    }
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-warm-bg text-warm-text">
@@ -42,6 +69,12 @@ export default async function ProjectWorkbenchPage({ params }: ProjectWorkbenchP
             projectName={project.name}
             initialLatestDocumentId={latestDocumentId}
             initialTextInput={project.textInput ?? null}
+            initialPageId={initialPageId}
+            initialPageName={initialPageName}
+            initialHtml={initialHtml}
+            initialVersionCount={initialVersionCount}
+            initialPreviewPath={initialPreviewPath}
+            initialSuggestion={initialSuggestion}
           />
         </div>
       </div>

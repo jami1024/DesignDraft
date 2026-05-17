@@ -3,7 +3,7 @@ import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promise
 import path from "node:path";
 import { nanoid } from "nanoid";
 
-import type { CreateProjectInput, CreateSourceDocumentInput, PageSuggestion, Project, SourceDocument, UpdateProjectInput } from "@/types";
+import type { CreateProjectInput, CreateSourceDocumentInput, GeneratedPage, PageSuggestion, PageVersion, PageVersionSource, Project, ProjectDesignMemory, ShareLink, SourceDocument, UpdateProjectInput } from "@/types";
 
 const DEFAULT_WORKSPACE_DIR = ".workspace";
 const PROJECTS_DIR = "projects";
@@ -93,6 +93,10 @@ export function getPagePath(projectId: string, pageId: string) {
 export function getPageVersionHtmlPath(projectId: string, pageId: string, versionId: string) {
   assertSafePathSegment(versionId, "versionId");
   return path.join(getPagePath(projectId, pageId), `${versionId}.html`);
+}
+
+export function getDesignMemoryPath(projectId: string) {
+  return path.join(getProjectPath(projectId), "design-memory.json");
 }
 
 export function getSharesPath() {
@@ -306,4 +310,212 @@ export async function listPageSuggestions(projectId: string): Promise<PageSugges
   }
 
   return readJsonFile<PageSuggestion[]>(suggestionsPath);
+}
+
+const PAGE_METADATA_FILE = "page.json";
+
+export function getPageMetadataPath(projectId: string, pageId: string) {
+  return path.join(getPagePath(projectId, pageId), PAGE_METADATA_FILE);
+}
+
+export async function getPage(projectId: string, pageId: string): Promise<GeneratedPage | null> {
+  const metadataPath = getPageMetadataPath(projectId, pageId);
+  if (!(await pathExists(metadataPath))) return null;
+  return readJsonFile<GeneratedPage>(metadataPath);
+}
+
+export async function createPage(
+  projectId: string,
+  suggestionId: string,
+  name: string,
+  html: string,
+  skillSnapshot: string[],
+  source: PageVersionSource = "initial-generation",
+): Promise<{ page: GeneratedPage; version: PageVersion }> {
+  const project = await getProject(projectId);
+  if (!project) throw new Error("Project not found");
+
+  const pageId = nanoid();
+  const versionId = "v1";
+  const now = new Date().toISOString();
+
+  await mkdir(getPagePath(projectId, pageId), { recursive: true });
+
+  const htmlPath = getPageVersionHtmlPath(projectId, pageId, versionId);
+  await writeFile(htmlPath, html, "utf8");
+
+  const version: PageVersion = {
+    id: versionId,
+    pageId,
+    versionNumber: 1,
+    htmlPath,
+    previewPath: `/previews/${projectId}/${pageId}/${versionId}`,
+    createdAt: now,
+    changeSummary: "初始生成",
+    skillSnapshot,
+    source,
+  };
+
+  const page: GeneratedPage = {
+    id: pageId,
+    projectId,
+    suggestionId,
+    name,
+    currentVersionId: versionId,
+    versionIds: [versionId],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await writeJsonFile(getPageMetadataPath(projectId, pageId), page);
+  await writeJsonFile(path.join(getPagePath(projectId, pageId), `${versionId}.json`), version);
+
+  const nextPageIds = project.pageIds.includes(pageId) ? project.pageIds : [...project.pageIds, pageId];
+  await updateProject(projectId, { pageIds: nextPageIds });
+
+  return { page, version };
+}
+
+export async function createPageVersion(
+  projectId: string,
+  pageId: string,
+  html: string,
+  changeSummary: string,
+  skillSnapshot: string[],
+  source: PageVersionSource,
+): Promise<{ page: GeneratedPage; version: PageVersion }> {
+  const page = await getPage(projectId, pageId);
+  if (!page) throw new Error("Page not found");
+
+  const versionNumber = page.versionIds.length + 1;
+  const versionId = `v${versionNumber}`;
+  const now = new Date().toISOString();
+
+  const htmlPath = getPageVersionHtmlPath(projectId, pageId, versionId);
+  await writeFile(htmlPath, html, "utf8");
+
+  const version: PageVersion = {
+    id: versionId,
+    pageId,
+    versionNumber,
+    htmlPath,
+    previewPath: `/previews/${projectId}/${pageId}/${versionId}`,
+    createdAt: now,
+    changeSummary,
+    skillSnapshot,
+    source,
+  };
+
+  await writeJsonFile(path.join(getPagePath(projectId, pageId), `${versionId}.json`), version);
+
+  const updatedPage: GeneratedPage = {
+    ...page,
+    currentVersionId: versionId,
+    versionIds: [...page.versionIds, versionId],
+    updatedAt: now,
+  };
+
+  await writeJsonFile(getPageMetadataPath(projectId, pageId), updatedPage);
+
+  return { page: updatedPage, version };
+}
+
+export async function getPageVersion(
+  projectId: string,
+  pageId: string,
+  versionId: string,
+): Promise<PageVersion | null> {
+  assertSafePathSegment(versionId, "versionId");
+  const versionPath = path.join(getPagePath(projectId, pageId), `${versionId}.json`);
+  if (!(await pathExists(versionPath))) return null;
+  return readJsonFile<PageVersion>(versionPath);
+}
+
+export async function readPageHtml(
+  projectId: string,
+  pageId: string,
+  versionId: string,
+): Promise<string | null> {
+  const htmlPath = getPageVersionHtmlPath(projectId, pageId, versionId);
+  if (!(await pathExists(htmlPath))) return null;
+  return readFile(htmlPath, "utf8");
+}
+
+const MESSAGES_FILE = "messages.json";
+
+export function getProjectMessagesPath(projectId: string) {
+  return path.join(getProjectPath(projectId), MESSAGES_FILE);
+}
+
+export async function loadChatMessages(projectId: string): Promise<import("@/types").ChatMessage[]> {
+  const messagesPath = getProjectMessagesPath(projectId);
+  if (!(await pathExists(messagesPath))) return [];
+  return readJsonFile<import("@/types").ChatMessage[]>(messagesPath);
+}
+
+export async function saveChatMessages(projectId: string, messages: import("@/types").ChatMessage[]): Promise<void> {
+  const messagesPath = getProjectMessagesPath(projectId);
+  await writeJsonFile(messagesPath, messages);
+}
+
+const SHARES_FILE = "shares.json";
+
+export function getSharesFilePath() {
+  return path.join(getSharesPath(), SHARES_FILE);
+}
+
+async function readShares(): Promise<ShareLink[]> {
+  const filePath = getSharesFilePath();
+  if (!(await pathExists(filePath))) return [];
+  return readJsonFile<ShareLink[]>(filePath);
+}
+
+async function writeShares(shares: ShareLink[]): Promise<void> {
+  await mkdir(getSharesPath(), { recursive: true });
+  await writeJsonFile(getSharesFilePath(), shares);
+}
+
+export async function createShareLink(share: ShareLink): Promise<ShareLink> {
+  const shares = await readShares();
+  shares.push(share);
+  await writeShares(shares);
+  return share;
+}
+
+export async function getShareByToken(token: string): Promise<ShareLink | null> {
+  const shares = await readShares();
+  return shares.find((s) => s.shareToken === token && !s.isRevoked) ?? null;
+}
+
+export async function listSharesByPage(pageId: string): Promise<ShareLink[]> {
+  const shares = await readShares();
+  return shares.filter((s) => s.pageId === pageId && !s.isRevoked);
+}
+
+export async function revokeShare(shareId: string): Promise<boolean> {
+  const shares = await readShares();
+  const share = shares.find((s) => s.id === shareId);
+  if (!share) return false;
+  share.isRevoked = true;
+  await writeShares(shares);
+  return true;
+}
+
+export async function incrementShareAccess(token: string): Promise<void> {
+  const shares = await readShares();
+  const share = shares.find((s) => s.shareToken === token);
+  if (share) {
+    share.accessCount += 1;
+    await writeShares(shares);
+  }
+}
+
+export async function loadDesignMemory(projectId: string): Promise<ProjectDesignMemory | null> {
+  const memoryPath = getDesignMemoryPath(projectId);
+  if (!(await pathExists(memoryPath))) return null;
+  return readJsonFile<ProjectDesignMemory>(memoryPath);
+}
+
+export async function saveDesignMemory(projectId: string, memory: ProjectDesignMemory): Promise<void> {
+  await writeJsonFile(getDesignMemoryPath(projectId), memory);
 }

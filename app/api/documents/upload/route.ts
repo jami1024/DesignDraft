@@ -21,6 +21,20 @@ function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._\-\u4e00-\u9fa5]/g, "_");
 }
 
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = new Set([".md", ".txt", ".pdf", ".docx"]);
+const ALLOWED_MIME_TYPES = new Set([
+  "text/plain",
+  "text/markdown",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+
+function getExtension(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? "" : name.slice(dot).toLowerCase();
+}
+
 export async function POST(request: Request) {
   let formData: FormData;
 
@@ -39,6 +53,19 @@ export async function POST(request: Request) {
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "请上传文件" }, { status: 400 });
+  }
+
+  if (file.size > MAX_UPLOAD_SIZE) {
+    return NextResponse.json({ error: "文件大小不能超过 10MB" }, { status: 413 });
+  }
+
+  const ext = getExtension(file.name);
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    return NextResponse.json({ error: `不支持的文件类型：${ext || "无扩展名"}，仅支持 .md/.txt/.pdf/.docx` }, { status: 415 });
+  }
+
+  if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+    return NextResponse.json({ error: "不支持的文件 MIME 类型" }, { status: 415 });
   }
 
   const project = await getProject(projectId);

@@ -1,4 +1,4 @@
-import type { PageSuggestion } from "@/types";
+import type { DesignDirection, PageSuggestion, ProjectDesignMemory } from "@/types";
 import type { AgentModelConfig } from "./model-config";
 import { DeepSeekRuntime } from "./deepseek-runtime";
 import { LightweightModelRuntime } from "./lightweight-runtime";
@@ -24,6 +24,12 @@ export type GeneratePageParams = {
   skillRules: string;
   stylePreset: string;
   outputRequirements: string;
+  designMemory?: ProjectDesignMemory;
+};
+
+export type OptimizeChatMessage = {
+  role: "user" | "assistant";
+  content: string;
 };
 
 export type OptimizePageParams = {
@@ -35,13 +41,22 @@ export type OptimizePageParams = {
     path: string;
     text?: string;
     stableId?: string;
+    screenshot?: string;
   };
   userInstruction: string;
   skillRules: string;
+  history?: OptimizeChatMessage[];
+  attachmentImages?: string[];
+  designMemory?: ProjectDesignMemory;
+};
+
+export type AnalyzeDocumentResult = {
+  designDirections: DesignDirection[];
+  suggestions: PageSuggestion[];
 };
 
 export interface AgentRuntimeAdapter {
-  analyzeDocument(params: AnalyzeDocumentParams): Promise<PageSuggestion[]>;
+  analyzeDocument(params: AnalyzeDocumentParams): Promise<AnalyzeDocumentResult>;
   generatePage(params: GeneratePageParams): AsyncGenerator<string, string>;
   optimizePage(params: OptimizePageParams): AsyncGenerator<string, string>;
 }

@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 
 import { createAgentRuntime } from "@/lib/agent/adapter";
 import { getAgentModelConfig } from "@/lib/agent/model-config";
-import { buildAnalyzeDocumentPrompt } from "@/lib/agent/prompts";
 import { getProject, getSourceDocument, savePageSuggestions } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -45,18 +44,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "文档内容为空" }, { status: 400 });
   }
 
-  const skillRules = await buildAnalyzeDocumentPrompt({
-    extractedText,
-    projectId: project.id,
-  });
   const runtimeAdapter = createAgentRuntime(getAgentModelConfig());
-  const suggestions = await runtimeAdapter.analyzeDocument({
+  const result = await runtimeAdapter.analyzeDocument({
     projectId: project.id,
     extractedText,
-    skillRules,
+    skillRules: "",
   });
 
-  await savePageSuggestions(project.id, suggestions);
+  await savePageSuggestions(project.id, result.suggestions);
 
-  return NextResponse.json({ suggestions });
+  return NextResponse.json({
+    designDirections: result.designDirections,
+    suggestions: result.suggestions,
+  });
 }

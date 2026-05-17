@@ -71,7 +71,7 @@ export function ProjectCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative block overflow-hidden rounded-xl border border-[#E7E5E4] bg-white p-5 shadow-warm-xs transition-all duration-300 hover:-translate-y-1 hover:border-[#3B82F6]/20 hover:shadow-[0_8px_30px_rgba(59,130,246,0.10),0_2px_8px_rgba(28,25,23,0.04)] focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 dark:border-[#44403C] dark:bg-[#292524] dark:hover:border-[#60A5FA]/20 dark:hover:shadow-[0_8px_30px_rgba(96,165,250,0.12),0_2px_8px_rgba(0,0,0,0.3)]"
+      className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-[#E7E5E4] bg-white p-5 shadow-warm-xs transition-all duration-300 hover:-translate-y-1 hover:border-[#3B82F6]/20 hover:shadow-[0_8px_30px_rgba(59,130,246,0.10),0_2px_8px_rgba(28,25,23,0.04)] focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 dark:border-[#44403C] dark:bg-[#292524] dark:hover:border-[#60A5FA]/20 dark:hover:shadow-[0_8px_30px_rgba(96,165,250,0.12),0_2px_8px_rgba(0,0,0,0.3)]"
     >
       {isHovered && (
         <div
@@ -82,7 +82,7 @@ export function ProjectCard({
         />
       )}
 
-      <div className="relative">
+      <div className="relative flex flex-1 flex-col">
         <div className="flex items-start gap-3">
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${color.bg} ${color.text}`}>
             {initial}
@@ -133,7 +133,7 @@ export function ProjectCard({
           </span>
         </div>
 
-        <div className="mt-3 flex items-center text-xs font-medium text-[#78716C] transition-colors duration-150 group-hover:text-[#2563EB] dark:text-[#A8A29E] dark:group-hover:text-[#60A5FA]">
+        <div className="mt-auto flex items-center pt-3 text-xs font-medium text-[#78716C] transition-colors duration-150 group-hover:text-[#2563EB] dark:text-[#A8A29E] dark:group-hover:text-[#60A5FA]">
           {CTA_MAP[status]}
           <ArrowRight className="ml-1 h-3 w-3 transition-transform duration-300 ease-out group-hover:translate-x-1.5 motion-reduce:group-hover:translate-x-0" />
         </div>

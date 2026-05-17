@@ -439,10 +439,10 @@ export function ProjectList() {
             {filteredProjects.map((project) => {
               const color = getAvatarColor(project.name);
               return (
-              <motion.div key={project.id} variants={shouldReduceMotion ? undefined : cardVariants}>
+              <motion.div key={project.id} variants={shouldReduceMotion ? undefined : cardVariants} className="h-full">
                 <Link
                   href={`/projects/${project.id}`}
-                  className="group block rounded-xl border border-[#E7E5E4] bg-white p-5 shadow-warm-xs transition-all duration-150 motion-reduce:transition-none hover:border-[#D6D3D1] hover:shadow-warm-md focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 dark:border-[#44403C] dark:bg-[#292524] dark:hover:border-[#57534E]"
+                  className="group flex h-full flex-col rounded-xl border border-[#E7E5E4] bg-white p-5 shadow-warm-xs transition-all duration-150 motion-reduce:transition-none hover:border-[#D6D3D1] hover:shadow-warm-md focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 dark:border-[#44403C] dark:bg-[#292524] dark:hover:border-[#57534E]"
                 >
                   <div className="flex items-start gap-3.5">
                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${color.bg} ${color.text}`}>
@@ -496,7 +496,7 @@ export function ProjectList() {
                     ) : null}
                   </div>
 
-                  <div className="mt-4 flex items-center border-t border-[#F5F5F4] pt-3.5 text-xs font-medium text-[#78716C] transition-colors duration-150 group-hover:text-[#2563EB] dark:border-[#44403C] dark:text-[#A8A29E] dark:group-hover:text-[#60A5FA]">
+                  <div className="mt-auto flex items-center border-t border-[#F5F5F4] pt-3.5 text-xs font-medium text-[#78716C] transition-colors duration-150 group-hover:text-[#2563EB] dark:border-[#44403C] dark:text-[#A8A29E] dark:group-hover:text-[#60A5FA]">
                     进入工作台
                     <ArrowRight className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:group-hover:translate-x-0" />
                   </div>

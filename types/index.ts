@@ -30,6 +30,8 @@ export type SourceDocument = {
   createdAt: IsoDateString;
 };
 
+export type DesignRegister = "brand" | "product";
+
 export type PageSuggestion = {
   id: string;
   projectId: string;
@@ -40,6 +42,8 @@ export type PageSuggestion = {
   recommendedSkillIds: string[];
   visualDirection: string;
   complexity: Complexity;
+  register?: DesignRegister;
+  designRules?: string;
 };
 
 export type GeneratedPage = {
@@ -86,6 +90,65 @@ export type ShareLink = {
   createdAt: IsoDateString;
   accessCount: number;
   isRevoked: boolean;
+};
+
+export type ChatAttachment = {
+  name: string;
+  url: string;
+  type: "image" | "file";
+  size?: string;
+};
+
+export type DesignDirection = {
+  id: string;
+  name: string;
+  description: string;
+  palette: string[];
+  colorStrategy: string;
+  typography: {
+    display: string;
+    body: string;
+  };
+  register: DesignRegister;
+  visualCharacteristics: string[];
+};
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  thinking?: string;
+  suggestions?: PageSuggestion[];
+  designDirections?: DesignDirection[];
+  generatedVersion?: number;
+  attachments?: ChatAttachment[];
+  timestamp: number;
+};
+
+export type ProjectDesignMemory = {
+  version: 1;
+  palette: {
+    colors: string[];
+    colorStrategy?: string;
+  };
+  typography: {
+    families: string[];
+    display?: string;
+    body?: string;
+    mono?: string;
+  };
+  register?: DesignRegister;
+  visualCharacteristics: string[];
+  pageContributions: ProjectDesignMemoryPageEntry[];
+  updatedAt: IsoDateString;
+};
+
+export type ProjectDesignMemoryPageEntry = {
+  pageId: string;
+  pageName: string;
+  register?: DesignRegister;
+  visualDirection: string;
+  extractedAt: IsoDateString;
 };
 
 export type CreateProjectInput = {

@@ -185,3 +185,64 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isSafeSlug(value: string) {
   return /^[a-z0-9][a-z0-9-]*$/.test(value);
 }
+
+const IMPECCABLE_ROOT = path.join(SKILLS_ROOT, "impeccable");
+const IMPECCABLE_REF_ROOT = path.join(IMPECCABLE_ROOT, "reference");
+
+export async function loadImpeccableCoreLaws(): Promise<string> {
+  const skillPath = path.join(IMPECCABLE_ROOT, "SKILL.md");
+  const raw = await readFile(skillPath, "utf8").catch(() => null);
+  if (!raw) return "";
+  const match = raw.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+  return match ? match[1].trim() : raw.trim();
+}
+
+export type DesignRegister = "brand" | "product";
+
+export async function loadRegisterReference(register: DesignRegister): Promise<string> {
+  const refPath = path.join(IMPECCABLE_REF_ROOT, `${register}.md`);
+  return readFile(refPath, "utf8").catch(() => "");
+}
+
+export async function loadDesignReferences(refIds: string[]): Promise<string> {
+  const unique = Array.from(new Set(refIds.filter(isSafeSlug)));
+  const contents = await Promise.all(
+    unique.map(async (id) => {
+      const content = await readFile(path.join(IMPECCABLE_REF_ROOT, `${id}.md`), "utf8").catch(() => null);
+      return content ? content.trim() : null;
+    }),
+  );
+  return contents.filter((c): c is string => c !== null).join("\n\n---\n\n");
+}
+
+export async function loadCommandReference(command: string): Promise<string> {
+  if (!isSafeSlug(command)) return "";
+  const refPath = path.join(IMPECCABLE_REF_ROOT, `${command}.md`);
+  return readFile(refPath, "utf8").catch(() => "").then((c) => c.trim());
+}
+
+const COMMAND_KEYWORDS: Array<{ keywords: string[]; command: string }> = [
+  { keywords: ["排版", "字体", "字号", "行高", "typography", "font"], command: "typeset" },
+  { keywords: ["配色", "颜色", "色彩", "调色", "color", "palette"], command: "colorize" },
+  { keywords: ["动画", "动效", "过渡", "animate", "motion", "transition"], command: "animate" },
+  { keywords: ["大胆", "冲击力", "太素", "太平", "bold", "bolder", "impact"], command: "bolder" },
+  { keywords: ["安静", "太花", "太吵", "太亮", "quiet", "tone down"], command: "quieter" },
+  { keywords: ["简化", "精简", "去掉", "删减", "simplify", "distill"], command: "distill" },
+  { keywords: ["间距", "布局", "对齐", "留白", "spacing", "layout", "align"], command: "layout" },
+  { keywords: ["打磨", "细节", "完善", "polish", "refine"], command: "polish" },
+  { keywords: ["趣味", "个性", "记忆点", "有趣", "delight", "fun", "personality"], command: "delight" },
+  { keywords: ["响应式", "移动端", "适配", "手机", "responsive", "mobile"], command: "adapt" },
+  { keywords: ["文案", "标签", "提示文字", "措辞", "copy", "label", "wording"], command: "clarify" },
+  { keywords: ["性能", "加载", "速度", "performance", "speed", "loading"], command: "optimize" },
+  { keywords: ["审查", "检查", "质量", "audit", "check", "quality"], command: "audit" },
+];
+
+export function inferOptimizeCommand(instruction: string): string | null {
+  const lower = instruction.toLowerCase();
+  for (const { keywords, command } of COMMAND_KEYWORDS) {
+    if (keywords.some((kw) => lower.includes(kw))) {
+      return command;
+    }
+  }
+  return null;
+}

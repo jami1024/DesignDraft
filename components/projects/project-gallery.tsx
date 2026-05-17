@@ -238,7 +238,7 @@ export function ProjectGallery({ onSuggestionClick, onProjectCountChange }: { on
             animate="show"
           >
             {filteredProjects.map((project) => (
-              <motion.div key={project.id} variants={shouldReduceMotion ? undefined : cardVariants} layout>
+              <motion.div key={project.id} variants={shouldReduceMotion ? undefined : cardVariants} layout className="h-full">
                 <ProjectCard
                   project={project}
                   onDelete={setProjectToDelete}

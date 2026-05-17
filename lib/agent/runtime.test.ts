@@ -20,13 +20,14 @@ describe("agent runtime adapter", () => {
   it("analyzes a document into page suggestions", async () => {
     const runtime = new LightweightModelRuntime({ provider: "mock", model: "demo" });
 
-    const suggestions = await runtime.analyzeDocument({
+    const result = await runtime.analyzeDocument({
       extractedText: "我们要做一个产品介绍官网，包含核心价值、功能、流程和行动按钮。",
       skillRules: "优先生成清晰、专业的中文页面建议。",
     });
 
-    expect(suggestions).toHaveLength(3);
-    expect(suggestions[0]).toMatchObject({
+    expect(result.designDirections).toHaveLength(2);
+    expect(result.suggestions).toHaveLength(3);
+    expect(result.suggestions[0]).toMatchObject({
       name: "产品介绍落地页",
       complexity: "medium",
       recommendedSkillIds: ["web-landing"],
