@@ -41,7 +41,9 @@ export type OptimizePageParams = {
     path: string;
     text?: string;
     stableId?: string;
+    parentStableId?: string;
     screenshot?: string;
+    markingFailed?: boolean;
   };
   userInstruction: string;
   skillRules: string;

@@ -382,29 +382,53 @@ export function WorkbenchLayout({ projectId, projectName, initialLatestDocumentI
           path: selectedElement.path,
           text: selectedElement.text,
           stableId: selectedElement.stableId,
+          parentStableId: selectedElement.parentStableId,
         };
 
         let marked = false;
-        try {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(generatedHtml, "text/html");
-          const target = doc.querySelector(selectedElement.path);
-          if (target) {
-            target.setAttribute("data-dd-target", "true");
-            payload.currentHtml = `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
-            marked = true;
-          }
-        } catch { /* ignore */ }
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(generatedHtml, "text/html");
+
+        // 策略 1: 用 data-designdraft-id 精确定位
+        if (!marked && selectedElement.stableId) {
+          try {
+            const target = doc.querySelector(`[data-designdraft-id="${CSS.escape(selectedElement.stableId)}"]`);
+            if (target) {
+              target.setAttribute("data-dd-target", "true");
+              payload.currentHtml = `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
+              marked = true;
+            }
+          } catch { /* ignore */ }
+        }
+
+        // 策略 2: 用 CSS path 定位
+        if (!marked) {
+          try {
+            const target = doc.querySelector(selectedElement.path);
+            if (target) {
+              target.setAttribute("data-dd-target", "true");
+              payload.currentHtml = `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
+              marked = true;
+            }
+          } catch { /* ignore */ }
+        }
+
+        // 策略 3: 用完整 opening tag 做字符串匹配
         if (!marked && selectedElement.html) {
-          const snippet = selectedElement.html.slice(0, 200);
-          const tagEnd = snippet.indexOf(">");
+          const tagEnd = selectedElement.html.indexOf(">");
           if (tagEnd > 0) {
-            const markedSnippet = snippet.slice(0, tagEnd) + ' data-dd-target="true"' + snippet.slice(tagEnd);
-            const replaced = generatedHtml.replace(snippet, markedSnippet);
+            const openingTag = selectedElement.html.slice(0, tagEnd);
+            const markedTag = openingTag + ' data-dd-target="true"';
+            const replaced = generatedHtml.replace(openingTag, markedTag);
             if (replaced !== generatedHtml) {
               payload.currentHtml = replaced;
+              marked = true;
             }
           }
+        }
+
+        if (!marked) {
+          selPayload.markingFailed = true;
         }
 
         try {

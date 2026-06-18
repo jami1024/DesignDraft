@@ -31,6 +31,7 @@ type BuildSelectionOptimizationPromptParams = {
   suggestion: PageSuggestion;
   selectedElement: {
     stableId?: string;
+    parentStableId?: string;
     path: string;
     html: string;
     text?: string;
@@ -223,7 +224,9 @@ export async function buildGeneratePagePrompt(params: BuildGeneratePagePromptPar
       "格式要求：",
       "- 只输出 HTML 代码，不要输出 Markdown 包裹（不要 ```html），不要输出解释文字",
       "- 以 <!doctype html> 开头，以 </html> 结尾",
-      "- 所有关键区块（hero、features、pricing 等）必须添加 data-designdraft-id 属性",
+      "- 所有可见的交互元素和内容元素都必须添加 data-designdraft-id 属性，包括但不限于：section、nav、header、footer、div 容器、h1-h6、p、a、button、input、textarea、select、img、ul/ol、li、table、form",
+      "- ID 格式：{区块}-{元素类型}-{序号}，如 hero-title、pricing-card-1、contact-email-input、nav-link-about",
+      "- 纯装饰性 span 或布局 wrapper 可不加，但所有用户可能想单独修改的元素必须有 ID",
       "- 所有用户可见文字使用中文，从需求文档中提取真实内容，禁止 Lorem ipsum 和占位数据",
       "",
       "设计质量要求：",
@@ -258,8 +261,8 @@ export async function buildSelectionOptimizationPrompt(params: BuildSelectionOpt
   ]);
 
   const elementId = params.selectedElement.stableId
-    ? `data-designdraft-id="${params.selectedElement.stableId}"`
-    : `path: ${params.selectedElement.path}`;
+    ? `定位方式: data-designdraft-id="${params.selectedElement.stableId}"（精确匹配）`
+    : `定位方式: CSS path ${params.selectedElement.path}（注意：请以 data-dd-target 标记为准）`;
 
   const role = section(
     "role",
@@ -339,6 +342,7 @@ export async function buildSelectionOptimizationPrompt(params: BuildSelectionOpt
       "- 必须返回完整 HTML（从 <!doctype html> 到 </html>），不是片段",
       "- 只有目标元素及其子元素可以与输入 HTML 不同，其余部分逐字节保留",
       "- 移除 data-dd-target 属性",
+      "- 保留所有 data-designdraft-id 属性不变（除非用户明确要求修改元素结构）",
       "- 不要输出解释文字，不要 Markdown 包裹，只输出 HTML",
     ].join("\n"),
   );

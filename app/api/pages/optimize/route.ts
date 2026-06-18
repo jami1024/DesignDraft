@@ -21,7 +21,9 @@ type RequestBody = {
     path: string;
     text?: string;
     stableId?: string;
+    parentStableId?: string;
     screenshot?: string;
+    markingFailed?: boolean;
   };
   history?: { role: "user" | "assistant"; content: string }[];
   attachmentImages?: string[];
