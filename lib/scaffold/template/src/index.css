@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens — the generation agent overwrites these per the chosen direction. */
+:root {
+  --background: oklch(0.99 0.004 95);
+  --foreground: oklch(0.2 0.01 260);
+  --primary: oklch(0.55 0.18 260);
+  --accent: oklch(0.7 0.16 40);
+  --neutral: oklch(0.6 0.008 260);
+  --success: oklch(0.7 0.15 150);
+  --error: oklch(0.62 0.2 25);
+  --warning: oklch(0.8 0.15 80);
+  --radius: 0.5rem;
+  --shadow: 0 1px 3px oklch(0.2 0.01 260 / 0.1), 0 8px 24px oklch(0.2 0.01 260 / 0.06);
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, sans-serif;
+}

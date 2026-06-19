@@ -11,6 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@codesandbox/sandpack-react": "^2.20.0",
+    "@earendil-works/pi-ai": "^0.79.7",
     "@radix-ui/react-slot": "^1.1.0",
     "@remotion/player": "^4.0.457",
     "bcryptjs": "^2.4.3",
@@ -26,7 +28,8 @@
     "react-dom": "^18.3.1",
     "remotion": "^4.0.457",
     "tailwind-merge": "^2.5.4",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "undici": "^6.27.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
