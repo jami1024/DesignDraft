@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 
 import { WorkbenchLayout } from "@/components/workbench/workbench-layout";
 import { getPage, getPageVersion, getProject, listPageSuggestions, listSourceDocuments, readPageHtml } from "@/lib/storage";
@@ -59,6 +59,13 @@ export default async function ProjectWorkbenchPage({ params }: ProjectWorkbenchP
             <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
           <h1 className="truncate font-serif text-sm font-bold tracking-tight text-[#1C1917] sm:text-base dark:text-[#FAFAF9]">{project.name}</h1>
+          <Link
+            href={`/projects/${project.id}/studio`}
+            className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-primary-700 motion-reduce:transition-none dark:bg-primary-500 dark:hover:bg-primary-400"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            React 生成
+          </Link>
         </div>
       </header>
 

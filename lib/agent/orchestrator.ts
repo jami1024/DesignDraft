@@ -39,6 +39,17 @@ function extractJson<T>(text: string): T {
   throw new Error("模型 JSON 不完整");
 }
 
+// The ④ agent may regenerate src/main.tsx and drop the scaffold's selector
+// import, which silently disables element picking (precise data-dd-id mapping).
+// Re-inject it after generation so the in-preview selector always loads.
+async function ensureSelectorImport(repo: ProjectRepo): Promise<void> {
+  const main = await repo.readFile("src/main.tsx");
+  if (main === null || main.includes("dd-selector")) return;
+  await repo.applyPatches([
+    { path: "src/main.tsx", op: "write", content: `import "./dd-selector";\n${main}` },
+  ]);
+}
+
 export async function getProduct(projectId: string): Promise<ProductSpec | null> {
   return (await pathExists(productPath(projectId))) ? readJsonFile<ProductSpec>(productPath(projectId)) : null;
 }
@@ -113,6 +124,7 @@ export async function* generate(projectId: string): AsyncGenerator<GenerateEvent
   const files = parseGeneratedFiles(full);
   if (files.length === 0) throw new Error("生成结果未包含任何文件");
   await repo.applyPatches(files);
+  await ensureSelectorImport(repo);
   const commit = await repo.commit("feat: 生成应用");
   yield { type: "done", commit: commit.hash, files: files.map((f) => f.path) };
 }

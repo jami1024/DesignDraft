@@ -19,15 +19,26 @@ export async function GET(request: Request) {
   }
 
   const paths = await repo.listFiles("src");
-  const entries = await Promise.all(
-    paths.map(async (p) => [`/${p}`, (await repo.readFile(p)) ?? ""] as const),
+
+  // Root config files Sandpack must use (not its template defaults) so the real
+  // vite.config (data-dd-id babel plugin) + Tailwind/PostCSS setup take effect.
+  const ROOT_CONFIGS = [
+    "vite.config.ts",
+    "tailwind.config.ts",
+    "postcss.config.js",
+    "index.html",
+    "tsconfig.json",
+  ];
+
+  const files: Record<string, string> = {};
+  await Promise.all(
+    [...paths, ...ROOT_CONFIGS].map(async (p) => {
+      const content = await repo.readFile(p);
+      if (content !== null) files[`/${p}`] = content;
+    }),
   );
   // package.json deps so Sandpack can resolve react-router-dom etc.
   const pkg = await repo.readFile("package.json");
 
-  return NextResponse.json({
-    ready: true,
-    files: Object.fromEntries(entries),
-    packageJson: pkg,
-  });
+  return NextResponse.json({ ready: true, files, packageJson: pkg });
 }
