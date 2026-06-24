@@ -627,8 +627,8 @@ type PrototypeProductSpec = {
 搜索没有找到名称完全等同于 `Analyze Prototype Agent` 的公开 X prompt。更接近的是以下几类讨论：
 
 1. **UX Agent 负责页面结构和用户流程**
-   - 例如 X 上关于多 Agent 做 SaaS MVP 的文章提到：UX Agent 负责 page structure、user flow、dashboard layout、report layout，前端 Agent 再负责构建 UI。
-   - 参考：[多 Agent SaaS MVP 讨论](https://x.com/sairahul1/status/2059691862043344968)
+   - X 上多 Agent MVP / SaaS 工作流的常见拆法是：UX Agent 先负责用户流程、页面结构、Dashboard / Report layout，Frontend Agent 再负责 UI 结构和组件实现。
+   - 参考：[UX Agent / Frontend Agent 分工讨论](https://x.com/Ai_Tech_tool/article/2060668807065325791)、[多 Agent SaaS MVP 讨论](https://x.com/sairahul1/status/2059691862043344968)
 
    对 DesignDraft 的借鉴：
 
@@ -637,9 +637,23 @@ type PrototypeProductSpec = {
    它负责把需求整理成页面结构、关键流程、业务目标和约束。
    ```
 
+   可落地为 Analyze Prototype Agent 的输出字段：
+
+   ```text
+   primaryGoal
+   keyFlows
+   requiredScreens
+   optionalScreens
+   successCriteria
+   constraints
+   ```
+
+   这类职责边界能避免“分析 Agent”过早进入页面生成，也能让后续 Plan Prototype Agent 有稳定输入。
+
 2. **UI/UX Architect Prompt**
-   - X 上有把 coding agent 转成 UI/UX architect 的 prompt 讨论，强调高水平设计判断、产品体验、视觉质量。
-   - 参考：[UI/UX architect prompt 讨论](https://x.com/kloss_xyz/status/2018869093789728799)
+   - X 上有把 coding agent 转成 UI/UX architect 的 prompt 讨论，重点不是写代码，而是用高级产品设计标准审查界面质量。
+   - 这类 prompt 通常会检查视觉层级、留白、字体、颜色、对齐、组件一致性、动效、空状态、加载状态、错误状态、响应式和可访问性。
+   - 参考：[UI/UX architect prompt 讨论](https://x.com/kloss_xyz/status/2018869093789728799)、[相关整理](https://godofprompt.beehiiv.com/p/you-suck-at-prompting)
 
    对 DesignDraft 的借鉴：
 
@@ -648,9 +662,19 @@ type PrototypeProductSpec = {
    但不要让 Analyze Prototype Agent 直接写高保真页面。
    ```
 
+   更适合落到后置质量检查：
+
+   ```text
+   Generate Prototype Agent 生成原型
+   → Review Prototype Agent 检查视觉层级、状态完整性、平台一致性、页面说明
+   → 不通过则自动修正一次或提示重新生成
+   ```
+
+   因此 UI/UX Architect Prompt 不应直接并入 Analyze Prototype Agent 主提示词，而应沉淀为 `Prototype Quality Review Rules`。
+
 3. **A2UI / Generative UI schema**
-   - X 上 CopilotKit 提到 A2UI 这类“Agent 输出 UI schema”的方向。
-   - 参考：[CopilotKit A2UI Widget Builder 讨论](https://x.com/CopilotKit/status/2000700073550995753)、[A2UI v0.9 讨论](https://x.com/CopilotKit/status/2045169479739695578)
+   - X 上 A2UI / Generative UI 的讨论重点是：Agent 不一定直接写死 UI，而是输出结构化 UI schema，再由前端组件系统渲染。
+   - 参考：[A2UI / Generative UI 讨论](https://x.com/Saboo_Shubham_/status/2062610190261006371)、[AG-UI Protocol](https://x.com/AGUI_Protocol)、[CopilotKit A2UI Widget Builder 讨论](https://x.com/CopilotKit/status/2000700073550995753)、[A2UI v0.9 讨论](https://x.com/CopilotKit/status/2045169479739695578)、[Google A2UI v0.9 官方说明](https://developers.googleblog.com/a2ui-v0-9-generative-ui/)
 
    对 DesignDraft 的借鉴：
 
@@ -659,9 +683,21 @@ type PrototypeProductSpec = {
    不应输出散文式分析。
    ```
 
+   第一版仍可以生成单文件 HTML 原型，但内部数据建议保留 schema 化方向：
+
+   ```text
+   PrototypeProductSpec
+   → PrototypeDirection[]
+   → PrototypeBoardSchema
+   → HTML renderer
+   ```
+
+   这样未来扩展到 React、Figma、小程序代码或客户端页面时，不需要重新理解用户需求，只需要更换渲染器。
+
 4. **Figma 内部 AI Agent 与多画布上下文**
-   - X 上关于 Figma AI Agent 的讨论强调：Agent 需要处理完整 UI/UX flows、screens、components，以及跨大量画布的上下文。
-   - 参考：[Nodey / Figma AI Agent 讨论](https://x.com/AdamFard_/article/2047682369511882953)、[parallel screen edits 讨论](https://x.com/ttorres/status/2039753227898339342)
+   - X 上关于 Figma Agent、Figma MCP、Google Stitch 的讨论都强调：AI 设计不是只生成一个单页，而是围绕多个 screen、flow、component、canvas 做连续编辑。
+   - Figma Agent 支持在设计文件里并行运行多个 prompt；Stitch 强调 AI-native canvas、agent manager、多方向探索，以及导出到 Figma。
+   - 参考：[Figma Design Agent 官方介绍](https://www.figma.com/blog/the-figma-agent-is-here/)、[Figma Agent 帮助文档](https://help.figma.com/hc/en-us/articles/37998629035799-Work-with-the-Figma-agent-in-design-files)、[Figma use_figma MCP X 公告](https://x.com/figma/status/2047415320131014970)、[Google Stitch 介绍](https://blog.google/innovation-and-ai/models-and-research/google-labs/stitch-ai-ui-design/)、[Stitch 导出 Figma X 公告](https://x.com/stitchbygoogle/status/2021320125983621626)
 
    对 DesignDraft 的借鉴：
 
@@ -670,6 +706,16 @@ type PrototypeProductSpec = {
    Analyze Prototype Agent 必须输出 requiredScreens、optionalScreens、keyFlows，
    让后续原型方案板天然支持多页面、多状态、多流程。
    ```
+
+   这会影响原型方案板的默认结构：
+
+   ```text
+   网站：多浏览器窗口 / 多页面缩略图 / 关键路径说明
+   移动端：多手机壳 / 首页、列表、详情、表单、状态页
+   小程序：多小程序手机壳 / 授权、首页、详情、发布、我的、空状态
+   ```
+
+   后续如果要对接 Figma，应优先导出“多页面结构化原型”，而不是把一整个 HTML 截图塞进 Figma。
 
 #### 本项目采用的结论
 
@@ -684,6 +730,27 @@ DesignDraft 不把 Analyze Prototype Agent 设计成“万能设计师”，而�
 ```
 
 这能同时吸收 baoyu-design 的 skill 分层能力、X 上 UX Agent 的职责拆分、A2UI 的结构化输出思路，以及 Figma Agent 多页面上下文的经验。
+
+进一步拆分后，原型主流程建议保留 5 个 Agent 边界：
+
+```text
+Analyze Prototype Agent
+  需求结构化、关键流程、页面范围、约束、缺失问题
+
+Plan Prototype Agent
+  基于 variationAxes 推荐 2-3 套差异化原型方案
+
+Generate Prototype Agent
+  生成高保真多页面原型方案板
+
+Review Prototype Agent
+  借鉴 UI/UX Architect Prompt 做质量检查
+
+Optimize Prototype Agent
+  支持对话修改、点选修改、版本迭代
+```
+
+第一版重点实现前三个 Agent；Review Prototype Agent 可先作为生成后的轻量校验规则，后续再独立成 Agent。
 
 ## 12. 后端 API
 
