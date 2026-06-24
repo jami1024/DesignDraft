@@ -17,6 +17,96 @@ export type Project = {
   pageIds: string[];
   currentSkillId: string;
   textInput?: string;
+  creationContext?: ProjectCreationContext;
+};
+
+export type PrototypePlatform = "website" | "mobile" | "miniapp";
+
+export type ProjectCreationContext = {
+  platform: PrototypePlatform;
+  audiences: string[];
+  audienceNote?: string;
+  useCases: string[];
+  useCaseNote?: string;
+  keywords?: string;
+};
+
+export type PrototypeKeyFlow = {
+  name: string;
+  entry: string;
+  goal: string;
+  screens: string[];
+};
+
+export type PrototypeVisualConstraints = {
+  styleKeywords: string[];
+  brandTone: string;
+  referenceApps: string[];
+  colorPreference?: string;
+};
+
+export type PrototypeProductSpec = {
+  summary: string;
+  platform: PrototypePlatform;
+  audienceSummary: string;
+  useCaseSummary: string;
+  contentScope: string;
+  primaryGoal: string;
+  successCriteria: string[];
+  keyFlows: PrototypeKeyFlow[];
+  requiredScreens: string[];
+  optionalScreens: string[];
+  fidelityTarget: "low-fi" | "mid-fi" | "hi-fi";
+  deviceFrame: "desktop-browser" | "mobile-app" | "miniapp-phone";
+  variationAxes: string[];
+  visualConstraints: PrototypeVisualConstraints;
+  assumptions: string[];
+  openQuestions: string[];
+  constraints: string[];
+};
+
+export type PrototypeDirection = {
+  id: string;
+  name: string;
+  scenario: string;
+  screenList: string[];
+  visualDirection: string;
+  complexity: Complexity;
+  estimatedScreens: number;
+  recommendationReason: string;
+};
+
+export type PrototypeDirectionsFile = {
+  directions: PrototypeDirection[];
+  selectedDirectionId: string | null;
+};
+
+export type PrototypeVersionSource =
+  | "initial-generation"
+  | "chat-optimization"
+  | "selection-optimization"
+  | "rollback";
+
+export type PrototypeVersion = {
+  id: string;
+  prototypeId: string;
+  versionNumber: number;
+  htmlPath: string;
+  previewPath: string;
+  createdAt: IsoDateString;
+  source: PrototypeVersionSource;
+  changeSummary: string;
+};
+
+export type PrototypeManifest = {
+  id: string;
+  projectId: string;
+  directionId: string;
+  name: string;
+  currentVersionId: string;
+  versionIds: string[];
+  createdAt: IsoDateString;
+  updatedAt: IsoDateString;
 };
 
 export type SourceDocument = {
@@ -153,6 +243,8 @@ export type ProjectDesignMemoryPageEntry = {
 
 export type CreateProjectInput = {
   name: string;
+  textInput?: string;
+  creationContext?: ProjectCreationContext;
 };
 
 export type UpdateProjectInput = Partial<Pick<Project, "name" | "textInput" | "sourceDocumentIds" | "pageIds" | "currentSkillId">>;
