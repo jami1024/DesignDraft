@@ -8,6 +8,36 @@ import {
 } from "@/lib/prototype-validation";
 
 describe("prototype validation", () => {
+  const validPrototypeProductSpecInput = {
+    summary: "校园活动发布小程序",
+    platform: "miniapp",
+    audienceSummary: "学生和社团负责人",
+    useCaseSummary: "用于产品演示和需求评审",
+    contentScope: "覆盖活动发现、详情、发布和我的",
+    primaryGoal: "让评审方理解完整活动流转",
+    successCriteria: ["看懂核心流程", "明确关键页面"],
+    keyFlows: [{ name: "报名活动", entry: "首页", goal: "完成报名", screens: ["首页", "详情页", "报名成功页"] }],
+    requiredScreens: ["首页", "详情页", "发布页", "我的页"],
+    optionalScreens: ["授权页"],
+    fidelityTarget: "hi-fi",
+    deviceFrame: "miniapp-phone",
+    variationAxes: ["轻量展示 vs 完整闭环"],
+    visualConstraints: {
+      styleKeywords: ["校园感", "暖色"],
+      brandTone: "亲和可信",
+      referenceApps: [],
+      colorPreference: "暖色",
+    },
+    assumptions: ["用户以手机访问为主"],
+    openQuestions: [],
+    constraints: ["不要默认拆管理端"],
+  };
+
+  const validPrototypeDirectionsInput = [
+    { id: "flow", name: "流程评审版", scenario: "需求评审", screenList: ["首页"], visualDirection: "清晰克制", complexity: "low", estimatedScreens: 5, recommendationReason: "流程最清楚" },
+    { id: "pitch", name: "提案展示版", scenario: "客户提案", screenList: ["首页"], visualDirection: "更有冲击力", complexity: "medium", estimatedScreens: 7, recommendationReason: "更适合展示" },
+  ];
+
   it("accepts supported prototype platforms", () => {
     expect(isPrototypePlatform("website")).toBe(true);
     expect(isPrototypePlatform("mobile")).toBe(true);
@@ -40,41 +70,41 @@ describe("prototype validation", () => {
   });
 
   it("parses a valid prototype product spec", () => {
-    const spec = parsePrototypeProductSpec({
-      summary: "校园活动发布小程序",
-      platform: "miniapp",
-      audienceSummary: "学生和社团负责人",
-      useCaseSummary: "用于产品演示和需求评审",
-      contentScope: "覆盖活动发现、详情、发布和我的",
-      primaryGoal: "让评审方理解完整活动流转",
-      successCriteria: ["看懂核心流程", "明确关键页面"],
-      keyFlows: [{ name: "报名活动", entry: "首页", goal: "完成报名", screens: ["首页", "详情页", "报名成功页"] }],
-      requiredScreens: ["首页", "详情页", "发布页", "我的页"],
-      optionalScreens: ["授权页"],
-      fidelityTarget: "hi-fi",
-      deviceFrame: "miniapp-phone",
-      variationAxes: ["轻量展示 vs 完整闭环"],
-      visualConstraints: {
-        styleKeywords: ["校园感", "暖色"],
-        brandTone: "亲和可信",
-        referenceApps: [],
-        colorPreference: "暖色",
-      },
-      assumptions: ["用户以手机访问为主"],
-      openQuestions: [],
-      constraints: ["不要默认拆管理端"],
-    });
+    const spec = parsePrototypeProductSpec(validPrototypeProductSpecInput);
 
     expect(spec.platform).toBe("miniapp");
     expect(spec.keyFlows[0].screens).toContain("详情页");
   });
 
+  it("rejects malformed optional arrays in prototype product spec", () => {
+    expect(() => parsePrototypeProductSpec({
+      ...validPrototypeProductSpecInput,
+      optionalScreens: "授权页",
+    })).toThrow("可选页面必须是数组");
+
+    expect(() => parsePrototypeProductSpec({
+      ...validPrototypeProductSpecInput,
+      assumptions: [123],
+    })).toThrow("假设条件必须是字符串数组");
+  });
+
   it("requires 2-3 prototype directions", () => {
     expect(() => parsePrototypeDirections([{ id: "a" }])).toThrow("需要生成 2-3 套原型方案");
-    const directions = parsePrototypeDirections([
-      { id: "flow", name: "流程评审版", scenario: "需求评审", screenList: ["首页"], visualDirection: "清晰克制", complexity: "low", estimatedScreens: 5, recommendationReason: "流程最清楚" },
-      { id: "pitch", name: "提案展示版", scenario: "客户提案", screenList: ["首页"], visualDirection: "更有冲击力", complexity: "medium", estimatedScreens: 7, recommendationReason: "更适合展示" },
-    ]);
+    const directions = parsePrototypeDirections(validPrototypeDirectionsInput);
     expect(directions).toHaveLength(2);
+  });
+
+  it("rejects non-finite estimated screen counts", () => {
+    expect(() => parsePrototypeDirections([
+      { ...validPrototypeDirectionsInput[0], estimatedScreens: Number.NaN },
+      validPrototypeDirectionsInput[1],
+    ])).toThrow("预计页面数必须是正数");
+  });
+
+  it("rejects malformed screen lists in prototype directions", () => {
+    expect(() => parsePrototypeDirections([
+      { ...validPrototypeDirectionsInput[0], screenList: ["首页", 123] },
+      validPrototypeDirectionsInput[1],
+    ])).toThrow("页面清单必须是字符串数组");
   });
 });

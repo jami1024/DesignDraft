@@ -20,8 +20,7 @@ function stringValue(value: unknown, label: string): string {
 }
 
 function stringArray(value: unknown, label: string): string[] {
-  if (!Array.isArray(value)) throw new Error(`${label}必须是数组`);
-  const result = uniqueTrimmedStrings(value);
+  const result = labeledStringArray(value, label, { allowMissing: false });
   if (result.length === 0) throw new Error(`${label}不能为空`);
   return result;
 }
@@ -32,19 +31,27 @@ function optionalString(value: unknown): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function uniqueTrimmedStrings(value: unknown[]): string[] {
-  return Array.from(
-    new Set(
-      value
-        .filter((item): item is string => typeof item === "string")
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
-  );
+function labeledStringArray(value: unknown, label: string, options: { allowMissing: boolean }): string[] {
+  if (value === undefined && options.allowMissing) return [];
+  if (!Array.isArray(value)) throw new Error(`${label}必须是数组`);
+
+  return value
+    .map((item) => {
+      if (typeof item !== "string" || !item.trim()) throw new Error(`${label}必须是字符串数组`);
+      return item.trim();
+    })
+    .filter((item, index, array) => array.indexOf(item) === index);
 }
 
-function optionalStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? uniqueTrimmedStrings(value) : [];
+function optionalStringArray(value: unknown, label: string): string[] {
+  return labeledStringArray(value, label, { allowMissing: true });
+}
+
+function positiveInteger(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label}必须是正数`);
+  }
+  return Math.round(value);
 }
 
 export function isPrototypePlatform(value: unknown): value is PrototypePlatform {
@@ -58,8 +65,8 @@ export function normalizeCreationContext(input: unknown): ProjectCreationContext
   const audienceNote = optionalString(input.audienceNote);
   const useCaseNote = optionalString(input.useCaseNote);
   const keywords = optionalString(input.keywords);
-  const audiences = optionalStringArray(input.audiences);
-  const useCases = optionalStringArray(input.useCases);
+  const audiences = optionalStringArray(input.audiences, "受众群体");
+  const useCases = optionalStringArray(input.useCases, "用途");
 
   if (audiences.length === 0 && !audienceNote) throw new Error("请至少选择或填写一个受众群体");
   if (useCases.length === 0 && !useCaseNote) throw new Error("请至少选择或填写一个用途");
@@ -111,19 +118,19 @@ export function parsePrototypeProductSpec(input: unknown): PrototypeProductSpec 
     successCriteria: stringArray(input.successCriteria, "成功标准"),
     keyFlows,
     requiredScreens: stringArray(input.requiredScreens, "必需页面"),
-    optionalScreens: optionalStringArray(input.optionalScreens),
+    optionalScreens: optionalStringArray(input.optionalScreens, "可选页面"),
     fidelityTarget: input.fidelityTarget as PrototypeProductSpec["fidelityTarget"],
     deviceFrame: input.deviceFrame as PrototypeProductSpec["deviceFrame"],
     variationAxes: stringArray(input.variationAxes, "方案差异维度"),
     visualConstraints: {
-      styleKeywords: optionalStringArray(visual.styleKeywords),
+      styleKeywords: optionalStringArray(visual.styleKeywords, "风格关键词"),
       brandTone: stringValue(visual.brandTone, "品牌语气"),
-      referenceApps: optionalStringArray(visual.referenceApps),
+      referenceApps: optionalStringArray(visual.referenceApps, "参考应用"),
       ...(colorPreference ? { colorPreference } : {}),
     },
-    assumptions: optionalStringArray(input.assumptions),
-    openQuestions: optionalStringArray(input.openQuestions),
-    constraints: optionalStringArray(input.constraints),
+    assumptions: optionalStringArray(input.assumptions, "假设条件"),
+    openQuestions: optionalStringArray(input.openQuestions, "开放问题"),
+    constraints: optionalStringArray(input.constraints, "约束条件"),
   };
 }
 
@@ -137,8 +144,7 @@ export function parsePrototypeDirections(input: unknown): PrototypeDirection[] {
     if (!COMPLEXITIES.includes(direction.complexity as PrototypeDirection["complexity"])) {
       throw new Error("方案复杂度无效");
     }
-    const estimatedScreens = typeof direction.estimatedScreens === "number" ? Math.round(direction.estimatedScreens) : 0;
-    if (estimatedScreens < 1) throw new Error("预计页面数必须大于 0");
+    const estimatedScreens = positiveInteger(direction.estimatedScreens, "预计页面数");
     return {
       id: stringValue(direction.id, "方案 ID"),
       name: stringValue(direction.name, "方案名称"),
