@@ -359,8 +359,27 @@ type PrototypeProductSpec = {
   audienceSummary: string;
   useCaseSummary: string;
   contentScope: string;
-  keyFlows: string[];
+  primaryGoal: string;
+  successCriteria: string[];
+  keyFlows: {
+    name: string;
+    entry: string;
+    goal: string;
+    screens: string[];
+  }[];
   requiredScreens: string[];
+  optionalScreens: string[];
+  fidelityTarget: "low-fi" | "mid-fi" | "hi-fi";
+  deviceFrame: "desktop-browser" | "mobile-app" | "miniapp-phone";
+  variationAxes: string[];
+  visualConstraints: {
+    styleKeywords: string[];
+    brandTone: string;
+    referenceApps: string[];
+    colorPreference?: string;
+  };
+  assumptions: string[];
+  openQuestions: string[];
   constraints: string[];
 };
 ```
@@ -452,6 +471,9 @@ Analyze Prototype Agent 只负责把原始需求整理成结构化产品分析�
 - 需求分析规则：提取产品目标、核心流程、页面范围、约束、未明确点。
 - 平台理解规则：区分 `website`、`mobile`、`miniapp` 的页面形态和流程表达方式。
 - 质量基础规则：避免输出空泛结论、AI 味很重的总结、或把分析阶段过早变成视觉设计阶段。
+- 信息充分性规则：判断是否可以继续推荐方案；如果关键信息不足，输出 1-3 个必须补问的问题。
+- 方案差异输入规则：输出 `variationAxes`，供后续 Plan Prototype Agent 生成真正不同的 2-3 套方案，而不是只换颜色。
+- 视觉约束提取规则：只提取用户表达过或可稳妥推导的风格关键词、品牌语气、参考产品、颜色偏好，不直接生成视觉稿。
 
 #### 不应加载的规则
 
@@ -500,6 +522,15 @@ Analyze Prototype Agent 只负责把原始需求整理成结构化产品分析�
    - 不要解释。
    - 不要生成 UI 方案。
    - 不要生成 HTML / React / WXML 代码。
+
+6. 判断信息是否足够
+   - 如果平台、受众、用途已明确，但核心业务目标或关键流程太模糊，可以在 openQuestions 中提出 1-3 个必须补问的问题。
+   - 问题必须具体、可回答，不能问“请补充更多信息”这种空泛问题。
+   - 即使存在 openQuestions，也要基于现有信息输出可用的 assumptions，方便后续继续推进。
+
+7. 为后续方案规划准备差异化方向
+   - variationAxes 只能描述方案差异维度，例如“流程完整度 vs 视觉冲击力”、“轻量展示 vs 完整业务闭环”、“偏销售提案 vs 偏产品评审”。
+   - 不要直接给出方案名称和完整方案卡片。
 ```
 
 #### 输出结构
@@ -511,11 +542,148 @@ type PrototypeProductSpec = {
   audienceSummary: string;
   useCaseSummary: string;
   contentScope: string;
-  keyFlows: string[];
+  primaryGoal: string;
+  successCriteria: string[];
+  keyFlows: {
+    name: string;
+    entry: string;
+    goal: string;
+    screens: string[];
+  }[];
   requiredScreens: string[];
+  optionalScreens: string[];
+  fidelityTarget: "low-fi" | "mid-fi" | "hi-fi";
+  deviceFrame: "desktop-browser" | "mobile-app" | "miniapp-phone";
+  variationAxes: string[];
+  visualConstraints: {
+    styleKeywords: string[];
+    brandTone: string;
+    referenceApps: string[];
+    colorPreference?: string;
+  };
+  assumptions: string[];
+  openQuestions: string[];
   constraints: string[];
 };
 ```
+
+### 11.2 外部 Agent / Skill 调研结论
+
+调研日期：2026-06-24。
+
+#### baoyu-design / baoyu skill 可借鉴点
+
+参考：
+
+- [JimLiu/baoyu-design](https://github.com/JimLiu/baoyu-design)
+- [baoyu-design skill 目录](https://github.com/JimLiu/baoyu-design/tree/main/skills/baoyu-design)
+
+`baoyu-design` 的定位是把设计生成能力封装成可移植 Agent Skill，能生成 mockup、prototype、wireframe、landing page、dashboard、mobile app、deck 等自包含 HTML 产物。它对 DesignDraft 的直接借鉴不是某一句提示词，而是它的工作流组织方式。
+
+可借鉴的设计：
+
+1. **Prompt 分层**
+   - `SKILL.md` 作为入口。
+   - `system-prompt.md` 存放通用设计方法和质量标准。
+   - `references/` 适配不同运行环境。
+   - `built-in-skills/` 存放移动端、线框图、设计系统等专项能力。
+
+   DesignDraft 可对应拆成：
+
+   ```text
+   Analyze Prototype Agent
+   ├─ core analysis prompt
+   ├─ website analysis rules
+   ├─ mobile analysis rules
+   ├─ miniapp analysis rules
+   ├─ output schema
+   └─ quality checklist
+   ```
+
+2. **按任务加载专项规则**
+   - baoyu-design 不把所有设计能力一次性塞进主提示词，而是根据任务加载对应 built-in skill。
+   - DesignDraft 也应根据平台加载不同规则：网站看信息架构和页面层级，移动端看手机流程和状态页，小程序看轻量路径、授权、首页、列表、详情、发布、我的等结构。
+
+3. **先确认，再生成**
+   - baoyu-design 强调先明确输出类型、保真度、约束和参考材料。
+   - DesignDraft 应在 Analyze Prototype Agent 阶段判断信息是否足够；不足时通过 `openQuestions` 让前端补问，而不是直接生成泛化方案。
+
+4. **设计系统与视觉约束**
+   - baoyu-design 对 design system、tokens、components、fonts 和 UI kit 的组织很明确。
+   - DesignDraft 第一版不需要完整设计系统，但 Analyze Prototype Agent 应先提取 `visualConstraints`，包括风格关键词、品牌语气、参考产品和颜色偏好，作为后续方案规划和原型生成的输入。
+
+5. **生成后验证**
+   - baoyu-design 的流程强调预览、截图、检查和修复。
+   - DesignDraft 后续 Generate Prototype Agent 应增加自动检查：HTML 是否完整、是否包含必要页面、是否符合所选平台外观、是否像原型方案板而不是普通单页网页。
+
+不应直接照搬的部分：
+
+- baoyu-design 偏“直接生成设计产物”。
+- DesignDraft 当前流程是“先分析 → 推荐方案 → 用户选择 → 再生成原型”。
+- 因此 Analyze Prototype Agent 不能变成页面生成 Agent，只能输出结构化分析和后续方案规划输入。
+
+#### X 上类似讨论与可借鉴方向
+
+搜索没有找到名称完全等同于 `Analyze Prototype Agent` 的公开 X prompt。更接近的是以下几类讨论：
+
+1. **UX Agent 负责页面结构和用户流程**
+   - 例如 X 上关于多 Agent 做 SaaS MVP 的文章提到：UX Agent 负责 page structure、user flow、dashboard layout、report layout，前端 Agent 再负责构建 UI。
+   - 参考：[多 Agent SaaS MVP 讨论](https://x.com/sairahul1/status/2059691862043344968)
+
+   对 DesignDraft 的借鉴：
+
+   ```text
+   Analyze Prototype Agent 不做视觉实现；
+   它负责把需求整理成页面结构、关键流程、业务目标和约束。
+   ```
+
+2. **UI/UX Architect Prompt**
+   - X 上有把 coding agent 转成 UI/UX architect 的 prompt 讨论，强调高水平设计判断、产品体验、视觉质量。
+   - 参考：[UI/UX architect prompt 讨论](https://x.com/kloss_xyz/status/2018869093789728799)
+
+   对 DesignDraft 的借鉴：
+
+   ```text
+   可以吸收“产品体验判断”和“高级设计标准”；
+   但不要让 Analyze Prototype Agent 直接写高保真页面。
+   ```
+
+3. **A2UI / Generative UI schema**
+   - X 上 CopilotKit 提到 A2UI 这类“Agent 输出 UI schema”的方向。
+   - 参考：[CopilotKit A2UI Widget Builder 讨论](https://x.com/CopilotKit/status/2000700073550995753)、[A2UI v0.9 讨论](https://x.com/CopilotKit/status/2045169479739695578)
+
+   对 DesignDraft 的借鉴：
+
+   ```text
+   Analyze Prototype Agent 的输出必须结构化、稳定、可被后续 Agent 消费；
+   不应输出散文式分析。
+   ```
+
+4. **Figma 内部 AI Agent 与多画布上下文**
+   - X 上关于 Figma AI Agent 的讨论强调：Agent 需要处理完整 UI/UX flows、screens、components，以及跨大量画布的上下文。
+   - 参考：[Nodey / Figma AI Agent 讨论](https://x.com/AdamFard_/article/2047682369511882953)、[parallel screen edits 讨论](https://x.com/ttorres/status/2039753227898339342)
+
+   对 DesignDraft 的借鉴：
+
+   ```text
+   原型不是单页面；
+   Analyze Prototype Agent 必须输出 requiredScreens、optionalScreens、keyFlows，
+   让后续原型方案板天然支持多页面、多状态、多流程。
+   ```
+
+#### 本项目采用的结论
+
+DesignDraft 不把 Analyze Prototype Agent 设计成“万能设计师”，而是设计成“原型需求结构化分析层”：
+
+```text
+用户自然语言
+→ Analyze Prototype Agent 输出稳定 JSON
+→ Plan Prototype Agent 生成 2-3 套差异化方案
+→ Generate Prototype Agent 生成高保真原型方案板
+→ Optimize Prototype Agent 讨论修改并保存新版本
+```
+
+这能同时吸收 baoyu-design 的 skill 分层能力、X 上 UX Agent 的职责拆分、A2UI 的结构化输出思路，以及 Figma Agent 多页面上下文的经验。
 
 ## 12. 后端 API
 
