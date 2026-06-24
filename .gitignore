@@ -8,6 +8,7 @@ out/
 
 # 运行时数据（项目约定）
 .workspace/
+.worktrees/
 
 # 环境变量
 .env
