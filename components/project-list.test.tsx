@@ -80,6 +80,7 @@ describe("ProjectList", () => {
 
     expect(await screen.findByText("官网演示页")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "删除 官网演示页" }));
+    await user.click(screen.getByRole("button", { name: "删除项目" }));
 
     await waitFor(() => {
       expect(screen.queryByText("官网演示页")).not.toBeInTheDocument();
