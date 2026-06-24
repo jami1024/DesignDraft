@@ -3,7 +3,25 @@ import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promise
 import path from "node:path";
 import { nanoid } from "nanoid";
 
-import type { CreateProjectInput, CreateSourceDocumentInput, GeneratedPage, PageSuggestion, PageVersion, PageVersionSource, Project, ProjectDesignMemory, ShareLink, SourceDocument, UpdateProjectInput } from "@/types";
+import type {
+  CreateProjectInput,
+  CreateSourceDocumentInput,
+  GeneratedPage,
+  PageSuggestion,
+  PageVersion,
+  PageVersionSource,
+  Project,
+  ProjectDesignMemory,
+  PrototypeDirection,
+  PrototypeDirectionsFile,
+  PrototypeManifest,
+  PrototypeProductSpec,
+  PrototypeVersion,
+  PrototypeVersionSource,
+  ShareLink,
+  SourceDocument,
+  UpdateProjectInput,
+} from "@/types";
 
 const DEFAULT_WORKSPACE_DIR = ".workspace";
 const PROJECTS_DIR = "projects";
@@ -11,6 +29,10 @@ const SHARES_DIR = "shares";
 const SKILLS_DIR = "skills";
 const PROJECT_METADATA_FILE = "project.json";
 const DOCUMENT_METADATA_FILE = "metadata.json";
+const PROTOTYPE_PRODUCT_FILE = "prototype-product.json";
+const PROTOTYPE_DIRECTIONS_FILE = "prototype-directions.json";
+const PROTOTYPES_DIR = "prototypes";
+const PROTOTYPE_METADATA_FILE = "prototype.json";
 const DEFAULT_SKILL_ID = "ui-ux-pro-max";
 
 function assertSafePathSegment(value: string, label: string) {
@@ -85,6 +107,32 @@ export function getProjectPagesPath(projectId: string) {
   return path.join(getProjectPath(projectId), "pages");
 }
 
+export function getProjectPrototypeProductPath(projectId: string) {
+  return path.join(getProjectPath(projectId), PROTOTYPE_PRODUCT_FILE);
+}
+
+export function getProjectPrototypeDirectionsPath(projectId: string) {
+  return path.join(getProjectPath(projectId), PROTOTYPE_DIRECTIONS_FILE);
+}
+
+export function getProjectPrototypesPath(projectId: string) {
+  return path.join(getProjectPath(projectId), PROTOTYPES_DIR);
+}
+
+export function getPrototypePath(projectId: string, prototypeId: string) {
+  assertSafePathSegment(prototypeId, "prototypeId");
+  return path.join(getProjectPrototypesPath(projectId), prototypeId);
+}
+
+export function getPrototypeMetadataPath(projectId: string, prototypeId: string) {
+  return path.join(getPrototypePath(projectId, prototypeId), PROTOTYPE_METADATA_FILE);
+}
+
+export function getPrototypeVersionHtmlPath(projectId: string, prototypeId: string, versionId: string) {
+  assertSafePathSegment(versionId, "versionId");
+  return path.join(getPrototypePath(projectId, prototypeId), `${versionId}.html`);
+}
+
 export function getPagePath(projectId: string, pageId: string) {
   assertSafePathSegment(pageId, "pageId");
   return path.join(getProjectPagesPath(projectId), pageId);
@@ -123,6 +171,7 @@ export async function ensureProjectDirectories(projectId: string) {
     mkdir(getProjectImagesPath(projectId), { recursive: true }),
     mkdir(getProjectSuggestionsPath(projectId), { recursive: true }),
     mkdir(getProjectPagesPath(projectId), { recursive: true }),
+    mkdir(getProjectPrototypesPath(projectId), { recursive: true }),
   ]);
 }
 
@@ -163,6 +212,8 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
     sourceDocumentIds: [],
     pageIds: [],
     currentSkillId: DEFAULT_SKILL_ID,
+    ...(input.textInput?.trim() ? { textInput: input.textInput.trim() } : {}),
+    ...(input.creationContext ? { creationContext: input.creationContext } : {}),
   };
 
   await ensureProjectDirectories(project.id);
@@ -312,6 +363,85 @@ export async function listPageSuggestions(projectId: string): Promise<PageSugges
   return readJsonFile<PageSuggestion[]>(suggestionsPath);
 }
 
+export async function savePrototypeProduct(
+  projectId: string,
+  product: PrototypeProductSpec,
+): Promise<PrototypeProductSpec> {
+  const project = await getProject(projectId);
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  await writeJsonFile(getProjectPrototypeProductPath(projectId), product);
+
+  return product;
+}
+
+export async function getPrototypeProduct(projectId: string): Promise<PrototypeProductSpec | null> {
+  const filePath = getProjectPrototypeProductPath(projectId);
+
+  if (!(await pathExists(filePath))) {
+    return null;
+  }
+
+  return readJsonFile<PrototypeProductSpec>(filePath);
+}
+
+export async function savePrototypeDirections(
+  projectId: string,
+  directions: PrototypeDirection[],
+): Promise<PrototypeDirectionsFile> {
+  const project = await getProject(projectId);
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const file: PrototypeDirectionsFile = {
+    directions,
+    selectedDirectionId: null,
+  };
+
+  await writeJsonFile(getProjectPrototypeDirectionsPath(projectId), file);
+
+  return file;
+}
+
+export async function getPrototypeDirections(projectId: string): Promise<PrototypeDirectionsFile | null> {
+  const filePath = getProjectPrototypeDirectionsPath(projectId);
+
+  if (!(await pathExists(filePath))) {
+    return null;
+  }
+
+  return readJsonFile<PrototypeDirectionsFile>(filePath);
+}
+
+export async function confirmPrototypeDirection(
+  projectId: string,
+  directionId: string,
+): Promise<PrototypeDirectionsFile> {
+  const file = await getPrototypeDirections(projectId);
+
+  if (!file) {
+    throw new Error("尚未生成原型方案");
+  }
+
+  if (!file.directions.some((direction) => direction.id === directionId)) {
+    throw new Error("原型方案不存在");
+  }
+
+  const updated: PrototypeDirectionsFile = {
+    ...file,
+    selectedDirectionId: directionId,
+  };
+
+  await writeJsonFile(getProjectPrototypeDirectionsPath(projectId), updated);
+
+  return updated;
+}
+
 const PAGE_METADATA_FILE = "page.json";
 
 export function getPageMetadataPath(projectId: string, pageId: string) {
@@ -438,6 +568,138 @@ export async function readPageHtml(
 ): Promise<string | null> {
   const htmlPath = getPageVersionHtmlPath(projectId, pageId, versionId);
   if (!(await pathExists(htmlPath))) return null;
+  return readFile(htmlPath, "utf8");
+}
+
+export async function getPrototype(projectId: string, prototypeId: string): Promise<PrototypeManifest | null> {
+  const metadataPath = getPrototypeMetadataPath(projectId, prototypeId);
+
+  if (!(await pathExists(metadataPath))) {
+    return null;
+  }
+
+  return readJsonFile<PrototypeManifest>(metadataPath);
+}
+
+export async function createPrototype(
+  projectId: string,
+  directionId: string,
+  name: string,
+  html: string,
+): Promise<{ prototype: PrototypeManifest; version: PrototypeVersion }> {
+  const project = await getProject(projectId);
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const prototypeId = nanoid();
+  const versionId = "v1";
+  const now = new Date().toISOString();
+
+  await mkdir(getPrototypePath(projectId, prototypeId), { recursive: true });
+
+  const htmlPath = getPrototypeVersionHtmlPath(projectId, prototypeId, versionId);
+  await writeFile(htmlPath, html, "utf8");
+
+  const version: PrototypeVersion = {
+    id: versionId,
+    prototypeId,
+    versionNumber: 1,
+    htmlPath,
+    previewPath: `/api/prototypes/${prototypeId}/versions/${versionId}/html?projectId=${projectId}`,
+    createdAt: now,
+    source: "initial-generation",
+    changeSummary: "初始生成",
+  };
+
+  const prototype: PrototypeManifest = {
+    id: prototypeId,
+    projectId,
+    directionId,
+    name,
+    currentVersionId: versionId,
+    versionIds: [versionId],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await writeJsonFile(getPrototypeMetadataPath(projectId, prototypeId), prototype);
+  await writeJsonFile(path.join(getPrototypePath(projectId, prototypeId), `${versionId}.json`), version);
+
+  return { prototype, version };
+}
+
+export async function createPrototypeVersion(
+  projectId: string,
+  prototypeId: string,
+  html: string,
+  changeSummary: string,
+  source: PrototypeVersionSource,
+): Promise<{ prototype: PrototypeManifest; version: PrototypeVersion }> {
+  const prototype = await getPrototype(projectId, prototypeId);
+
+  if (!prototype) {
+    throw new Error("Prototype not found");
+  }
+
+  const versionNumber = prototype.versionIds.length + 1;
+  const versionId = `v${versionNumber}`;
+  const now = new Date().toISOString();
+
+  const htmlPath = getPrototypeVersionHtmlPath(projectId, prototypeId, versionId);
+  await writeFile(htmlPath, html, "utf8");
+
+  const version: PrototypeVersion = {
+    id: versionId,
+    prototypeId,
+    versionNumber,
+    htmlPath,
+    previewPath: `/api/prototypes/${prototypeId}/versions/${versionId}/html?projectId=${projectId}`,
+    createdAt: now,
+    source,
+    changeSummary,
+  };
+
+  const updatedPrototype: PrototypeManifest = {
+    ...prototype,
+    currentVersionId: versionId,
+    versionIds: [...prototype.versionIds, versionId],
+    updatedAt: now,
+  };
+
+  await writeJsonFile(getPrototypeMetadataPath(projectId, prototypeId), updatedPrototype);
+  await writeJsonFile(path.join(getPrototypePath(projectId, prototypeId), `${versionId}.json`), version);
+
+  return { prototype: updatedPrototype, version };
+}
+
+export async function getPrototypeVersion(
+  projectId: string,
+  prototypeId: string,
+  versionId: string,
+): Promise<PrototypeVersion | null> {
+  assertSafePathSegment(versionId, "versionId");
+  const versionPath = path.join(getPrototypePath(projectId, prototypeId), `${versionId}.json`);
+
+  if (!(await pathExists(versionPath))) {
+    return null;
+  }
+
+  return readJsonFile<PrototypeVersion>(versionPath);
+}
+
+export async function readPrototypeHtml(
+  projectId: string,
+  prototypeId: string,
+  versionId: string,
+): Promise<string | null> {
+  const htmlPath = getPrototypeVersionHtmlPath(projectId, prototypeId, versionId);
+
+  if (!(await pathExists(htmlPath))) {
+    return null;
+  }
+
   return readFile(htmlPath, "utf8");
 }
 
