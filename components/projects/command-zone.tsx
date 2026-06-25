@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2, Paperclip, Sparkles } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
-import type { Project } from "@/types";
+import type { Project, ProjectCreationContext } from "@/types";
+import { ProjectCreationContextDialog } from "./project-creation-context-dialog";
 
 function extractProjectName(description: string): string {
   const cleaned = description.trim().replace(/[，。！？、：；""''（）\[\]{}…—·\s]+$/g, "");
@@ -30,6 +31,7 @@ export function CommandZone({
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
+  const [pendingRequirement, setPendingRequirement] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,13 +44,21 @@ export function CommandZone({
     setShakeKey((k) => k + 1);
   }, []);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(() => {
     const text = description.trim();
     if (!text) {
       triggerError("请先输入需求描述");
       textareaRef.current?.focus();
       return;
     }
+
+    setError(null);
+    setPendingRequirement(text);
+  }, [description, triggerError]);
+
+  const confirmTextProject = useCallback(async (context: ProjectCreationContext) => {
+    const text = pendingRequirement?.trim();
+    if (!text) return;
 
     setSubmitState("creating");
     setError(null);
@@ -58,19 +68,14 @@ export function CommandZone({
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, textInput: text, creationContext: context }),
       });
       const body = (await res.json()) as { project?: Project; error?: string };
       if (!res.ok || !body.project) throw new Error(body.error ?? "项目创建失败");
 
-      await fetch("/api/documents/text-input", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: body.project.id, text }),
-      });
-
       onProjectCreated?.(body.project);
       setSubmitState("success");
+      setPendingRequirement(null);
 
       setTimeout(() => {
         setDescription("");
@@ -83,7 +88,7 @@ export function CommandZone({
       triggerError(e instanceof Error ? e.message : "创建失败");
       setTimeout(() => setSubmitState("idle"), 3000);
     }
-  }, [description, onProjectCreated, router, triggerError]);
+  }, [onProjectCreated, pendingRequirement, router, triggerError]);
 
   const handleFileDrop = useCallback(async (files: FileList) => {
     const file = files[0];
@@ -233,6 +238,14 @@ export function CommandZone({
       className={compact ? "" : "text-center"}
       onBlur={handleBlur}
     >
+      {pendingRequirement ? (
+        <ProjectCreationContextDialog
+          requirement={pendingRequirement}
+          onCancel={() => setPendingRequirement(null)}
+          onConfirm={(context) => void confirmTextProject(context)}
+        />
+      ) : null}
+
       {!compact && (
         <div className="mb-4 inline-flex items-center gap-2">
           <motion.div
