@@ -48,10 +48,10 @@ function optionalStringArray(value: unknown, label: string): string[] {
 }
 
 function positiveInteger(value: unknown, label: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || !Number.isInteger(value)) {
     throw new Error(`${label}必须是正数`);
   }
-  return Math.round(value);
+  return value;
 }
 
 export function isPrototypePlatform(value: unknown): value is PrototypePlatform {

@@ -101,6 +101,13 @@ describe("prototype validation", () => {
     ])).toThrow("预计页面数必须是正数");
   });
 
+  it("rejects non-integer estimated screen counts", () => {
+    expect(() => parsePrototypeDirections([
+      { ...validPrototypeDirectionsInput[0], estimatedScreens: 5.6 },
+      validPrototypeDirectionsInput[1],
+    ])).toThrow("预计页面数必须是正数");
+  });
+
   it("rejects malformed screen lists in prototype directions", () => {
     expect(() => parsePrototypeDirections([
       { ...validPrototypeDirectionsInput[0], screenList: ["首页", 123] },
