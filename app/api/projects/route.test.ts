@@ -48,4 +48,53 @@ describe("/api/projects", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "项目名称不能为空" });
   });
+
+  it("creates a project with immutable prototype creation context", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "校园活动助手",
+          textInput: "做一个校园活动小程序原型",
+          creationContext: {
+            platform: "miniapp",
+            audiences: ["学生", "普通用户"],
+            audienceNote: "社团负责人",
+            useCases: ["产品演示", "需求评审"],
+            keywords: "暖色、校园感",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.project.textInput).toBe("做一个校园活动小程序原型");
+    expect(body.project.creationContext).toEqual({
+      platform: "miniapp",
+      audiences: ["学生", "普通用户"],
+      audienceNote: "社团负责人",
+      useCases: ["产品演示", "需求评审"],
+      keywords: "暖色、校园感",
+    });
+  });
+
+  it("rejects invalid prototype creation context", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "错误项目",
+          creationContext: {
+            platform: "desktop",
+            audiences: ["客户"],
+            useCases: ["产品演示"],
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "平台类型不支持" });
+  });
 });
