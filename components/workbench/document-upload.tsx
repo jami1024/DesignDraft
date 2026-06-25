@@ -119,6 +119,9 @@ export function DocumentUpload({ projectId, initialText, onDocumentSaved }: Docu
         </div>
 
         <form onSubmit={handleTextSubmit}>
+          <label htmlFor="requirement-text" className="sr-only">
+            直接输入需求
+          </label>
           <textarea
             id="requirement-text"
             value={text}
@@ -134,6 +137,7 @@ export function DocumentUpload({ projectId, initialText, onDocumentSaved }: Docu
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
+              aria-label="上传文档"
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-warm-text-muted transition-colors hover:bg-warm-subtle hover:text-warm-text focus-visible:ring-2 focus-visible:ring-primary-500/50 disabled:opacity-50"
             >
               {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
@@ -142,6 +146,7 @@ export function DocumentUpload({ projectId, initialText, onDocumentSaved }: Docu
             <input
               ref={fileInputRef}
               type="file"
+              aria-label="上传 .md 或 .txt 文件"
               accept=".md,.txt,.pdf,.docx"
               className="hidden"
               onChange={(e) => { if (e.target.files?.[0]) void handleFileUpload(e.target.files[0]); }}
@@ -151,6 +156,7 @@ export function DocumentUpload({ projectId, initialText, onDocumentSaved }: Docu
 
             <button
               type="submit"
+              aria-label="保存文本需求"
               disabled={!text.trim() || isLoading}
               className="ml-auto inline-flex h-7 items-center gap-1.5 rounded-lg bg-warm-text px-3 text-xs font-semibold text-white transition-colors hover:bg-warm-text/80 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
             >

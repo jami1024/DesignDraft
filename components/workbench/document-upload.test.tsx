@@ -63,7 +63,6 @@ describe("DocumentUpload", () => {
     render(<DocumentUpload projectId="project-1" />);
 
     await user.upload(screen.getByLabelText("上传 .md 或 .txt 文件"), new File(["# brief"], "brief.md", { type: "text/markdown" }));
-    await user.click(screen.getByRole("button", { name: "上传文档" }));
 
     expect(await screen.findByText("brief.md")).toBeInTheDocument();
     expect(screen.getByText("# brief")).toBeInTheDocument();

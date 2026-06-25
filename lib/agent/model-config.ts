@@ -11,7 +11,7 @@ export type AgentModelConfig = {
 };
 
 const DEFAULT_PROVIDER: AgentProvider = "mock";
-const DEFAULT_MODEL = "deepseek-v4-flash";
+const DEFAULT_MODEL = "designdraft-mock-designer";
 
 export function isSupportedProvider(value: string): value is AgentProvider {
   return SUPPORTED_AGENT_PROVIDERS.includes(value as AgentProvider);
