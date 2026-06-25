@@ -2,13 +2,15 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, ArrowUpDown, ChevronDown, Clock, FileText, FolderOpen, Layers, Loader2, Play, Plus, Search, Trash2, X } from "lucide-react";
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import type { Variants } from "framer-motion";
 
-import type { Project } from "@/types";
+import type { Project, ProjectCreationContext } from "@/types";
+import { ProjectCreationContextDialog } from "@/components/projects/project-creation-context-dialog";
 
 const DemoPlayer = dynamic(
   () => import("@/components/remotion/demo-player").then((m) => m.DemoPlayer),
@@ -187,10 +189,12 @@ function DemoSection() {
 }
 
 export function ProjectList() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [pendingRequirement, setPendingRequirement] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -248,18 +252,28 @@ export function ProjectList() {
 
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError("请先输入项目名称");
+      setError("请先描述你想做的产品或页面");
       return;
     }
 
+    setError(null);
+    setPendingRequirement(trimmedName);
+  }
+
+  async function confirmCreateProject(context: ProjectCreationContext) {
+    if (!pendingRequirement) return;
+
     setIsCreating(true);
     setError(null);
-
     try {
       const response = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmedName }),
+        body: JSON.stringify({
+          name: pendingRequirement.slice(0, 32),
+          textInput: pendingRequirement,
+          creationContext: context,
+        }),
       });
       const body = (await response.json()) as { project?: Project; error?: string };
 
@@ -269,6 +283,8 @@ export function ProjectList() {
 
       setProjects((currentProjects) => [body.project as Project, ...currentProjects]);
       setName("");
+      setPendingRequirement(null);
+      router.push(`/projects/${body.project.id}`);
     } catch (currentError) {
       setError(currentError instanceof Error ? currentError.message : "项目创建失败");
     } finally {
@@ -301,6 +317,14 @@ export function ProjectList() {
 
   return (
     <div className="space-y-10">
+      {pendingRequirement ? (
+        <ProjectCreationContextDialog
+          requirement={pendingRequirement}
+          onCancel={() => setPendingRequirement(null)}
+          onConfirm={(context) => void confirmCreateProject(context)}
+        />
+      ) : null}
+
       {projectToDelete && (
         <DeleteConfirmModal
           projectName={projectToDelete.name}
@@ -318,19 +342,19 @@ export function ProjectList() {
         <div className="flex items-baseline justify-between">
           <h2 className="font-serif text-lg font-bold text-[#1C1917] dark:text-[#FAFAF9]">新建项目</h2>
         </div>
-        <p className="mt-1 text-sm text-[#78716C] dark:text-[#A8A29E]">输入名称，为你的演示场景创建工作区</p>
+        <p className="mt-1 text-sm text-[#78716C] dark:text-[#A8A29E]">描述你想做的产品或页面，AI 会先帮你分析并推荐原型方案</p>
 
         <div className="mt-4 rounded-xl border border-[#E7E5E4] bg-white p-5 shadow-warm-sm dark:border-[#44403C] dark:bg-[#292524]">
           <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleCreateProject}>
             <div className="flex-1">
               <label className="sr-only" htmlFor="project-name">
-                项目名称
+                项目需求
               </label>
               <input
                 id="project-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="例如：春季发布会客户演示"
+                placeholder="例如：做一个校园活动报名小程序，给学生和社团负责人使用"
                 className="h-10 w-full rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] px-3.5 py-2 text-sm text-[#1C1917] outline-none transition-all duration-150 motion-reduce:transition-none placeholder:text-[#A8A29E] focus:border-[#3B82F6] focus:bg-white focus:ring-2 focus:ring-[#3B82F6]/20 dark:border-[#44403C] dark:bg-[#1C1917] dark:text-[#FAFAF9] dark:placeholder:text-[#78716C] dark:focus:border-[#60A5FA] dark:focus:bg-[#292524] dark:focus:ring-[#60A5FA]/20"
               />
             </div>
@@ -340,7 +364,7 @@ export function ProjectList() {
               className="group inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1C1917] px-5 py-2 text-sm font-semibold text-white transition-colors duration-150 motion-reduce:transition-none hover:bg-[#44403C] focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#FAFAF9] dark:text-[#1C1917] dark:hover:bg-[#E7E5E4]"
             >
               {isCreating ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <Plus className="h-4 w-4" />}
-              创建项目
+              开始
             </button>
           </form>
 
@@ -416,7 +440,7 @@ export function ProjectList() {
             </div>
             <h3 className="mt-5 text-[15px] font-semibold text-[#1C1917] dark:text-[#FAFAF9]">还没有项目</h3>
             <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-[#78716C] dark:text-[#A8A29E]">
-              在上方输入项目名称，创建你的第一个演示项目
+              在上方描述产品或页面，创建你的第一个原型项目
             </p>
           </motion.div>
         ) : filteredProjects.length === 0 && searchQuery.trim() ? (

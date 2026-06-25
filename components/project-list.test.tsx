@@ -6,6 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectList } from "./project-list";
 import type { Project } from "@/types";
 
+const pushMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock }),
+}));
+
 const projects: Project[] = [
   {
     id: "project-1",
@@ -19,6 +25,7 @@ const projects: Project[] = [
 ];
 
 beforeEach(() => {
+  pushMock.mockReset();
   vi.stubGlobal("confirm", vi.fn(() => true));
   vi.stubGlobal(
     "fetch",
@@ -28,12 +35,15 @@ beforeEach(() => {
         return Response.json({ projects });
       }
       if (url === "/api/projects" && init?.method === "POST") {
+        const payload = init.body ? JSON.parse(init.body.toString()) : {};
         return Response.json(
           {
             project: {
               ...projects[0],
               id: "project-2",
-              name: "新项目",
+              name: payload.name ?? "新项目",
+              textInput: payload.textInput,
+              creationContext: payload.creationContext,
               updatedAt: "2026-05-02T02:00:00.000Z",
             },
           },
@@ -68,10 +78,37 @@ describe("ProjectList", () => {
     const user = userEvent.setup();
     render(<ProjectList />);
 
-    await user.type(screen.getByLabelText("项目名称"), "新项目");
-    await user.click(screen.getByRole("button", { name: "创建项目" }));
+    await user.type(screen.getByLabelText("项目需求"), "做一个校园活动报名小程序，给学生使用");
+    await user.click(screen.getByRole("button", { name: "开始" }));
+    expect(await screen.findByText("确认生成方向")).toBeInTheDocument();
 
-    expect(await screen.findByText("新项目")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "小程序" }));
+    await user.click(screen.getByRole("button", { name: "学生" }));
+    await user.click(screen.getByRole("button", { name: "产品演示" }));
+    await user.click(screen.getByRole("button", { name: "开始分析" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/projects",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            name: "做一个校园活动报名小程序，给学生使用",
+            textInput: "做一个校园活动报名小程序，给学生使用",
+            creationContext: {
+              platform: "miniapp",
+              audiences: ["学生"],
+              useCases: ["产品演示"],
+            },
+          }),
+        }),
+      );
+    });
+    expect(await screen.findByRole("link", { name: /做一个校园活动报名小程序，给学生使用/ })).toHaveAttribute(
+      "href",
+      "/projects/project-2",
+    );
+    expect(pushMock).toHaveBeenCalledWith("/projects/project-2");
   });
 
   it("deletes a project", async () => {
