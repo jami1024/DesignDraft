@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 
+import { PrototypeWorkbench } from "@/components/prototypes/prototype-workbench";
 import { WorkbenchLayout } from "@/components/workbench/workbench-layout";
 import { getPage, getPageVersion, getProject, listPageSuggestions, listSourceDocuments, readPageHtml } from "@/lib/storage";
 
@@ -71,18 +72,22 @@ export default async function ProjectWorkbenchPage({ params }: ProjectWorkbenchP
 
       <div className="flex-1">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <WorkbenchLayout
-            projectId={project.id}
-            projectName={project.name}
-            initialLatestDocumentId={latestDocumentId}
-            initialTextInput={project.textInput ?? null}
-            initialPageId={initialPageId}
-            initialPageName={initialPageName}
-            initialHtml={initialHtml}
-            initialVersionCount={initialVersionCount}
-            initialPreviewPath={initialPreviewPath}
-            initialSuggestion={initialSuggestion}
-          />
+          {project.creationContext ? (
+            <PrototypeWorkbench project={project} />
+          ) : (
+            <WorkbenchLayout
+              projectId={project.id}
+              projectName={project.name}
+              initialLatestDocumentId={latestDocumentId}
+              initialTextInput={project.textInput ?? null}
+              initialPageId={initialPageId}
+              initialPageName={initialPageName}
+              initialHtml={initialHtml}
+              initialVersionCount={initialVersionCount}
+              initialPreviewPath={initialPreviewPath}
+              initialSuggestion={initialSuggestion}
+            />
+          )}
         </div>
       </div>
     </main>
