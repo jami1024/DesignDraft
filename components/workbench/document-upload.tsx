@@ -119,6 +119,9 @@ export function DocumentUpload({ projectId, initialText, onDocumentSaved }: Docu
         </div>
 
         <form onSubmit={handleTextSubmit}>
+          <label htmlFor="requirement-text" className="sr-only">
+            直接输入需求
+          </label>
           <textarea
             id="requirement-text"
             aria-label="直接输入需求"
@@ -136,6 +139,7 @@ export function DocumentUpload({ projectId, initialText, onDocumentSaved }: Docu
               aria-label="上传文档"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
+              aria-label="上传文档"
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-warm-text-muted transition-colors hover:bg-warm-subtle hover:text-warm-text focus-visible:ring-2 focus-visible:ring-primary-500/50 disabled:opacity-50"
             >
               {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}

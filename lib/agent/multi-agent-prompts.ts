@@ -106,6 +106,7 @@ export async function buildGeneratePrompt(args: {
     "- 禁把整个应用塞进 max-w-md mx-auto 居中卡片;禁设备外框——body 就是应用本身。",
     "- 卡片是懒答案,禁嵌套卡片,别什么都套 container。",
     "- 字体最多 2 个字族;正文 line-height 1.4-1.6,行宽 65-75ch。",
+    "- 禁止 import/npm 引入字体包或外部 CSS（例如 @fontsource/*、Google Fonts）;只能在 CSS 中写字体栈，依赖系统/浏览器已有字体回退。",
     "- 间距 4pt 基准并制造节奏;用 gap 不用 margin 堆叠;禁 arbitrary Tailwind 值(禁 p-[16px]/bg-[#123])。",
     "- 文案:按钮=动词+宾语;错误信息三段式(发生什么/为什么/怎么修);禁假 CTA。",
     "- 移动优先;语义 HTML + 正确 ARIA;非装饰图加 alt。",

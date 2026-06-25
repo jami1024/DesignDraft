@@ -24,7 +24,6 @@ export async function GET(request: Request) {
   // vite.config (data-dd-id babel plugin) + Tailwind/PostCSS setup take effect.
   const ROOT_CONFIGS = [
     "vite.config.ts",
-    "tailwind.config.ts",
     "postcss.config.js",
     "index.html",
     "tsconfig.json",
